@@ -15,39 +15,38 @@
               </div>
           </div>
           <div class="flex gap-3 w-full lg:w-auto">
-              <button 
-                @click="handleLogout" 
-                title="登出"
+              <button
+                @click="handleLogout" title="登出"
                 class="btn-secondary" >
                 <span class="flex items-center gap-2">🚪 <span class="hidden sm:inline">登出</span></span>
               </button>
-              
-              <button 
-                @click="$emit('navigate', 'inspection')" 
+
+              <button
+                @click="$emit('navigate', 'inspection')"
                 :class="view === 'inspection' ? 'btn-primary' : 'btn-secondary'" class="flex-1 lg:flex-none"
               >
                 <span class="flex items-center gap-2">📋 <span>檢查模式</span></span>
               </button>
-              
-              <button 
+
+              <button
                 v-if="userRole === 'admin'"
-                @click="$emit('navigate', 'admin')" 
+                @click="$emit('navigate', 'admin')"
                 :class="view === 'admin' ? 'btn-primary' : 'btn-secondary'" class="flex-1 lg:flex-none"
               >
                 <span class="flex items-center gap-2">⚙️ <span>後台管理</span></span>
               </button>
           </div>
       </div>
-      
+
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
           <div>
               <label for="dormZone" class="form-label flex items-center gap-1">
                   🏢 <span>宿舍分區</span>
               </label>
-              <select 
-                id="dormZone" 
-                class="form-control" 
-                :value="dormZone" 
+              <select
+                id="dormZone"
+                class="form-control"
+                :value="dormZone"
                 @input="$emit('update:dormZone', $event.target.value)"
               >
                   <option value="">請選擇分區</option>
@@ -66,13 +65,13 @@
                     <span v-if="validationState === 'invalid'" class="text-xs text-red-500 dark:text-red-400">❌ 無此房號</span>
                   </div>
               </label>
-              <input 
-                type="text" 
-                id="roomNumber" 
-                class="form-control" 
-                :class="{ 
-                    'border-green-500 focus:border-green-500 focus:ring-green-500/20': validationState === 'valid', 
-                    'border-red-500 focus:border-red-500 focus:ring-red-500/20': validationState === 'invalid' 
+              <input
+                type="text"
+                id="roomNumber"
+                class="form-control"
+                :class="{
+                    'border-green-500 focus:border-green-500 focus:ring-green-500/20': validationState === 'valid',
+                    'border-red-500 focus:border-red-500 focus:ring-red-500/20': validationState === 'invalid'
                 }"
                 :value="roomNumberInput"
                 @input="$emit('update:roomNumberInput', $event.target.value)"
@@ -85,10 +84,10 @@
               <label for="checkType" class="form-label flex items-center gap-1">
                   📝 <span>檢查類型</span>
               </label>
-              <select 
-                id="checkType" 
-                class="form-control" 
-                :value="checkType" 
+              <select
+                id="checkType"
+                class="form-control"
+                :value="checkType"
                 @input="$emit('update:checkType', $event.target.value)"
               >
                  <option value="">請選擇類型</option>
@@ -101,17 +100,17 @@
               <label for="inspector" class="form-label flex items-center gap-1">
                   👤 <span>檢查人員</span>
               </label>
-              <input 
-                type="text" 
-                id="inspector" 
-                class="form-control" 
-                placeholder="請輸入姓名" 
-                :value="inspector" 
+              <input
+                type="text"
+                id="inspector"
+                class="form-control"
+                placeholder="請輸入姓名"
+                :value="inspector"
                 @input="$emit('update:inspector', $event.target.value)"
               >
           </div>
       </div>
-      
+
       <div id="inspectionMode" v-if="view === 'inspection'">
           <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-5">
               <div class="flex justify-between items-center mb-3">
@@ -121,32 +120,40 @@
                       </div>
                       <span class="font-semibold text-slate-700 dark:text-slate-300">檢查進度</span>
                   </div>
-                  <span 
-                    class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium" 
+                  <span
+                    class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium"
                     :class="progressClass"
                   >
                     {{ progress.completed }}/{{ progress.total }} 完成 ({{ progress.percentage }}%)
                   </span>
               </div>
               <div class="w-full h-2 bg-slate-200 dark:bg-slate-600 rounded-full overflow-hidden">
-                  <div 
-                    class="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full transition-all duration-500 ease-in-out" 
+                  <div
+                    class="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full transition-all duration-500 ease-in-out"
                     :style="{ width: `${progress.percentage}%` }">
                   </div>
               </div>
           </div>
       </div>
+      <ConfirmModal
+        v-model="showLogoutConfirm"
+        title="確認登出"
+        message="您確定要登出系統嗎？"
+        confirm-text="登出"
+        confirm-variant="danger"
+        @confirm="executeLogout"
+      />
   </header>
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue' // <-- 加入 ref
 import { useRouter } from 'vue-router'
 import { supabase } from '../services/supabase' //
 import { userStore } from '../store/user' //
 import { configStore } from '../store/config' //
+import ConfirmModal from './ConfirmModal.vue'; // <-- 1. 匯入組件
 
-// --- (Props, Emits, Router, User, Config logic remains the same) ---
 const props = defineProps({
   dormZone: String,
   roomNumber: String,
@@ -162,30 +169,37 @@ const user = userStore.state.user //
 const userEmail = computed(() => user?.email || '訪客')
 const userRole = computed(() => userStore.state.role) //
 const config = configStore.state //
+const showLogoutConfirm = ref(false); // <-- 2. 加入 modal 狀態
 
-// --- (Logout handler remains the same) ---
-const handleLogout = async () => {
-  if (confirm('確定要登出嗎？')) {
-    const { error } = await supabase.auth.signOut() //
-    if (!error) {
-      router.push({ name: 'Login' }) //
-    }
+// 3. 修改 handleLogout，只負責打開 modal
+const handleLogout = () => {
+  showLogoutConfirm.value = true;
+}
+
+// 4. 新增實際執行的函數
+const executeLogout = async () => {
+  const { error } = await supabase.auth.signOut() //
+  if (!error) {
+    router.push({ name: 'Login' }) //
+  } else {
+    console.error("登出失敗:", error);
+    // showToast('登出失敗，請稍後再試。', 'error');
   }
 }
 
-// --- (Room validation logic remains the same) ---
+// --- Room validation logic ---
 const validationState = ref('idle');
 watch(() => props.dormZone, () => { validationState.value = 'idle'; });
 watch(() => props.roomNumberInput, (newInput) => {
     if (validationState.value !== 'idle') validationState.value = 'idle';
     if (props.roomNumber) emit('update:roomNumber', '');
 });
-const validateRoom = async () => { /* ... implementation ... */ 
+const validateRoom = async () => {
     const zoneId = props.dormZone;
     const roomInput = props.roomNumberInput ? props.roomNumberInput.trim() : '';
     if (!zoneId || !roomInput) {
         validationState.value = 'idle';
-        emit('update:roomNumber', ''); 
+        emit('update:roomNumber', '');
         return;
     }
     validationState.value = 'loading';
@@ -195,9 +209,8 @@ const validateRoom = async () => { /* ... implementation ... */
             .select('id')
             .eq('zone_id', zoneId)
             .eq('room_number', roomInput)
-            .single(); 
+            .single();
         if (error || !data) {
-            console.warn("房號驗證失敗:", error?.message || '找不到房號');
             validationState.value = 'invalid';
             emit('update:roomNumber', '');
         } else {
@@ -205,14 +218,12 @@ const validateRoom = async () => { /* ... implementation ... */
             emit('update:roomNumber', data.id);
         }
     } catch (e) {
-        console.error("驗證房號時發生例外:", e);
         validationState.value = 'invalid';
         emit('update:roomNumber', '');
     }
 }
 
-
-// --- (Progress class logic remains the same) ---
+// --- Progress class logic ---
 const progressClass = computed(() => {
   if (!props.progress) return 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
   const p = props.progress.percentage
