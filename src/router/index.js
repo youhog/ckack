@@ -14,7 +14,8 @@ import ManageRooms from '../views/admin/ManageRooms.vue'
 import ManageTypes from '../views/admin/ManageTypes.vue' 
 import ManageChecklist from '../views/admin/ManageChecklist.vue' 
 import ManageUsers from '../views/admin/ManageUsers.vue' 
-import ManageAllocation from '../views/admin/ManageAllocation.vue' // ADDED: 引入床位分配管理
+import ManageAllocation from '../views/admin/ManageAllocation.vue' 
+import ManagePermissions from '../views/admin/ManagePermissions.vue' // ADDED: 引入權限管理
 import KeyReturn from '../views/KeyReturn.vue' 
 
 // routes 
@@ -38,7 +39,8 @@ const routes = [
           { path: 'rooms', name: 'ManageRooms', component: ManageRooms, meta: { title: '管理房間' } },
           { path: 'types', name: 'ManageTypes', component: ManageTypes, meta: { title: '管理檢查類型' } },
           { path: 'checklist', name: 'ManageChecklist', component: ManageChecklist, meta: { title: '管理檢查項目' } },
-          { path: 'allocation', name: 'ManageAllocation', component: ManageAllocation, meta: { title: '床位匯入' } }, // ADDED
+          { path: 'allocation', name: 'ManageAllocation', component: ManageAllocation, meta: { title: '床位匯入' } },
+          { path: 'permissions', name: 'ManagePermissions', component: ManagePermissions, meta: { title: '權限管理' } }, // ADDED
           { path: 'users', name: 'ManageUsers', component: ManageUsers, meta: { title: '帳號管理' } }
         ]
       }
@@ -70,7 +72,6 @@ router.beforeEach(async (to, from, next) => {
           resolve();
         }
       });
-      // REMOVED: 移除超時強制繼續
     });
   };
 

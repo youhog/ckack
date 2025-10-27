@@ -38,7 +38,8 @@ const adminLinks = [
   { name: 'ManageRooms', icon: '🚪', text: '管理房間' },
   { name: 'ManageTypes', icon: '📝', text: '管理類型' },
   { name: 'ManageChecklist', icon: '📋', text: '管理檢查項目' },
-  { name: 'ManageAllocation', icon: '🛏️', text: '床位匯入' }, // ADDED
+  { name: 'ManageAllocation', icon: '🛏️', text: '床位匯入' },
+  { name: 'ManagePermissions', icon: '🔒', text: '權限管理' }, // ADDED
   { name: 'ManageUsers', icon: '👥', text: '管理使用者' } 
 ];
 

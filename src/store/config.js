@@ -4,11 +4,12 @@ import { supabase } from '../services/supabase'
 
 const state = reactive({
   zones: [],
-  rooms: [], // 此陣列將保持為空，不再由 config 載入
+  rooms: [], 
   checkTypes: [],
   checklistCategories: [], 
   checklistItems: [],
-  roles: [], // ADDED: 新增 roles 狀態，用於管理員介面
+  roles: [], // ADDED: 新增 roles 狀態
+  permissions: [], // ADDED: 新增 permissions 狀態
   loading: false,
   error: null
 })
@@ -17,16 +18,17 @@ const state = reactive({
 const fetchConfig = async () => {
   state.loading = true
   state.error = null
-  console.log("正在從 Supabase 載入設定 (已跳過 Rooms)..."); // 添加日誌
+  console.log("正在從 Supabase 載入設定 (已跳過 Rooms)..."); 
   
   try {
-    // 【修改】新增獲取所有角色的請求
-    const [zonesRes, typesRes, categoriesRes, itemsRes, rolesRes] = await Promise.all([
+    // 【修改】新增獲取所有角色和權限的請求
+    const [zonesRes, typesRes, categoriesRes, itemsRes, rolesRes, permsRes] = await Promise.all([
       supabase.from('dorm_zones').select('id, name, description').order('name'),
       supabase.from('check_types').select('id, name, description').order('name'),
       supabase.from('checklist_categories').select('id, name, icon').order('display_order'),
       supabase.from('checklist_items').select('id, category_id, name').order('display_order'),
-      supabase.from('user_roles').select('role'), // ADDED: 獲取所有不重複的角色名稱
+      supabase.from('roles').select('id, name, description').order('name'), // MODIFIED: 從 roles 表獲取所有角色
+      supabase.from('permissions').select('id, name, description').order('name'), // ADDED: 獲取所有權限
     ])
 
     // 檢查是否有任何請求失敗
@@ -34,7 +36,9 @@ const fetchConfig = async () => {
     if (typesRes.error) throw new Error(`載入類型失敗: ${typesRes.error.message}`);
     if (categoriesRes.error) throw new Error(`載入分類失敗: ${categoriesRes.error.message}`);
     if (itemsRes.error) throw new Error(`載入項目失敗: ${itemsRes.error.message}`);
-    if (rolesRes.error) console.warn(`載入角色列表失敗 (非致命): ${rolesRes.error.message}`); // ADDED
+    if (rolesRes.error) console.warn(`載入角色列表失敗 (非致命): ${rolesRes.error.message}`); 
+    if (permsRes.error) console.warn(`載入權限列表失敗 (非致命): ${permsRes.error.message}`);
+
 
     // 更新狀態
     state.zones = zonesRes.data
@@ -42,10 +46,10 @@ const fetchConfig = async () => {
     state.checklistCategories = categoriesRes.data 
     state.checklistItems = itemsRes.data       
     
-    // ADDED: 處理角色列表
-    const rolesData = Array.isArray(rolesRes.data) ? rolesRes.data : [];
-    state.roles = [...new Set(rolesData.map(r => r.role))].map(role => ({ name: role }));
-
+    // 處理角色列表 (包含 id, name, description)
+    state.roles = Array.isArray(rolesRes.data) ? rolesRes.data : [];
+    
+    state.permissions = Array.isArray(permsRes.data) ? permsRes.data : []; // ADDED
 
     console.log("設定載入成功:", { 
         zones: state.zones.length, 
@@ -53,7 +57,8 @@ const fetchConfig = async () => {
         types: state.checkTypes.length,
         categories: state.checklistCategories.length,
         items: state.checklistItems.length,
-        roles: state.roles.length // ADDED
+        roles: state.roles.length,
+        permissions: state.permissions.length
     });
     
   } catch (error) {
@@ -71,7 +76,8 @@ const clearConfig = () => {
   state.checkTypes = [];
   state.checklistCategories = [];
   state.checklistItems = [];
-  state.roles = []; // ADDED
+  state.roles = []; 
+  state.permissions = []; 
   state.error = null;
 }
 

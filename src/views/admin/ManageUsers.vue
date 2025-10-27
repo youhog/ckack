@@ -81,19 +81,28 @@ const isSaving = reactive({})
 const currentUserId = userStore.state.user?.id; 
 const config = configStore.state; 
 
-const localAvailableRoles = ref([]); // MODIFIED: Local state for roles list
+const localAvailableRoles = ref([]); 
 
 const availableRoles = computed(() => { 
-    return localAvailableRoles.value.map(r => r.name).sort(); 
+    // MODIFIED: 從 configStore.roles 獲取，因為它現在是權威來源
+    return config.roles.map(r => r.name).sort(); 
 });
 
 const fetchUsers = async () => {
     loading.value = true;
     error.value = null;
     
-    // MODIFIED START: 使用兩次查詢取代複雜的 PostgREST 關聯查詢
+    // MODIFIED: 確保 configStore 已經獲取了 roles
+    if (config.roles.length === 0) {
+        await configStore.fetchConfig(); 
+    }
+    // MODIFIED: 將 config.roles 賦值給 localAvailableRoles
+    localAvailableRoles.value = config.roles;
+
+    console.log("ManageUsers: Fetching users (from profiles)...");
+
     try {
-        // 1. Fetch User Profiles (with created_at from auth.users)
+        // 1. Fetch User Profiles (profiles, created_at from auth.users)
         const { data: profilesData, error: profilesError } = await supabase
             .from('profiles')
             .select(`id, email, created_at`)
@@ -101,7 +110,7 @@ const fetchUsers = async () => {
 
         if (profilesError) throw profilesError;
         
-        // 2. Fetch all User Roles
+        // 2. Fetch all User Roles (仍然從 user_roles 獲取實際分配的角色)
         const { data: rolesData, error: rolesError } = await supabase
             .from('user_roles')
             .select(`user_id, role`);
@@ -127,43 +136,24 @@ const fetchUsers = async () => {
         users.value = mergedUsers;
          console.log(`Fetched ${users.value.length} users.`);
     } catch (fetchError) {
-        // 捕捉任何錯誤，包括 profilesError 和 rolesError
         error.value = `載入使用者列表失敗: ${fetchError.message}`;
         console.error("Fetch users error:", fetchError);
         showToast(error.value, 'error');
     }
-    // MODIFIED END
 
     loading.value = false;
 };
 
-// ADDED: 輔助函式，從 DB 載入所有角色
-const fetchAllRoles = async () => {
-    try {
-        const { data, error } = await supabase.from('user_roles').select('role');
-        if (error) throw error;
-        
-        const rolesData = Array.isArray(data) ? data : []; 
-        // 提取所有不重複的角色名稱
-        const uniqueRoles = [...new Set(rolesData.map(r => r.role))].map(role => ({ name: role }));
-        
-        localAvailableRoles.value = uniqueRoles; // MODIFIED: 寫入到本地狀態
-        
-    } catch (e) {
-        console.error("Failed to load roles for select box:", e);
-    }
-};
+// REMOVED: 刪除 fetchAllRoles 輔助函數，直接使用 configStore.fetchConfig
 
 onMounted(() => {
-    // 確保 localAvailableRoles 在 mounted 時被載入
-    if (localAvailableRoles.value.length === 0) {
-        fetchAllRoles(); 
-    }
+    // MODIFIED: 只需要確保 config 已載入，並從 config 獲取角色
     fetchUsers();
 });
 
 
 const canEditRole = (user) => {
+// ... (此函數邏輯保持不變) ...
     // 檢查當前登入者是否為 'admin'
     if (userStore.state.role !== 'admin') {
         return false;
@@ -183,6 +173,7 @@ const canEditRole = (user) => {
 };
 
 const updateRole = async (user) => {
+// ... (此函數邏輯保持不變) ...
     if (!canEditRole(user) || !user.isDirty) {
         return;
     }
