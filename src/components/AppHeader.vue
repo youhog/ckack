@@ -32,6 +32,14 @@
               </button>
 
               <button
+                @click="$emit('navigate', 'key-return')"
+                :class="view === 'key-return' ? 'btn-primary' : 'btn-secondary'"
+                class="flex-1 lg:flex-none"
+              >
+                <span class="flex items-center gap-2">🔑 <span>歸還模式</span></span>
+              </button>
+
+              <button
                 v-if="userRole === 'admin'"
                 @click="$emit('navigate', 'admin')"
                 :class="view === 'admin' ? 'btn-primary' : 'btn-secondary'"
@@ -90,6 +98,7 @@
                 class="form-control"
                 :value="checkType"
                 @change="$emit('update:checkType', $event.target.value)"
+                :disabled="view === 'key-return'"
               >
                  <option value="">請選擇類型</option>
                  <option v-for="type in config.checkTypes" :key="type.id" :value="type.id">
@@ -150,18 +159,18 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue' //
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { supabase } from '../services/supabase' //
-import { userStore } from '../store/user' //
-import { configStore } from '../store/config' //
+import { supabase } from '../services/supabase' 
+import { userStore } from '../store/user' 
+import { configStore } from '../store/config' 
 import ConfirmModal from './ConfirmModal.vue'; 
-import { showToast } from '@/utils'; // 引入 showToast
+import { showToast } from '@/utils'; 
 
 const props = defineProps({
   dormZone: String,
-  roomNumber: String, // 這是 room.id
-  roomNumberInput: String, // 這是輸入框的文字 (現在是隱藏的)
+  roomNumber: String, 
+  roomNumberInput: String, 
   checkType: String,
   inspector: String,
   view: String,
@@ -169,22 +178,20 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:dormZone', 'update:roomNumber', 'update:roomNumberInput', 'update:checkType', 'update:inspector', 'navigate'])
 const router = useRouter()
-const user = userStore.state.user //
+const user = userStore.state.user 
 const userEmail = computed(() => user?.email || '訪客')
-const userRole = computed(() => userStore.state.role) //
-const config = configStore.state //
+const userRole = computed(() => userStore.state.role) 
+const config = configStore.state 
 
 const showLogoutConfirm = ref(false); 
-const allRooms = ref([]); // 所有房間的本地快取
+const allRooms = ref([]); 
 const loadingRooms = ref(false);
 
-// *** 新增: 獲取所有房間列表 (一次性載入) ***
 const fetchAllRooms = async () => {
     loadingRooms.value = true;
     try {
-        // 從資料庫獲取所有房間資料
-        const { data, error } = await supabase //
-            .from('rooms') //
+        const { data, error } = await supabase 
+            .from('rooms') 
             .select('id, zone_id, room_number')
             .order('room_number', { ascending: true });
 
@@ -197,42 +204,36 @@ const fetchAllRooms = async () => {
         loadingRooms.value = false;
     }
 }
-// 應用程式啟動時載入房間
 fetchAllRooms();
 
 
-// *** 修改 1.1: 根據選擇的區域篩選房間列表 ***
 const availableRooms = computed(() => {
     if (!props.dormZone) return [];
     return allRooms.value
         .filter(room => room.zone_id === props.dormZone)
-        .sort((a, b) => a.room_number.localeCompare(b.room_number)); // 確保排序
+        .sort((a, b) => a.room_number.localeCompare(b.room_number)); 
 });
 
-// *** 修改 1.2: 處理區域變化並重設房號 ***
 const onZoneChange = (newZoneId) => {
     emit('update:dormZone', newZoneId);
-    // 重設 roomNumber 和 roomNumberInput (AppLayout.vue 也有類似邏輯，但這裡確保立即反應)
     emit('update:roomNumber', '');
     emit('update:roomNumberInput', ''); 
 }
 
 
-// --- 登出邏輯 (使用 Modal) ---
 const handleLogout = () => {
   showLogoutConfirm.value = true;
 }
 
 const executeLogout = async () => {
-  const { error } = await supabase.auth.signOut() //
+  const { error } = await supabase.auth.signOut() 
   if (!error) {
-    router.push({ name: 'Login' }) //
+    router.push({ name: 'Login' }) 
   } else {
     console.error("登出失敗:", error);
   }
 }
 
-// --- Progress class logic ---
 const progressClass = computed(() => {
   if (!props.progress) return 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
   const p = props.progress.percentage
@@ -243,20 +244,70 @@ const progressClass = computed(() => {
 </script>
 
 <style scoped>
-/* Define reusable styles using @apply */
 .form-label {
-  @apply block mb-1.5 text-sm font-medium text-slate-700 dark:text-slate-300;
+  display: block;
+  margin-bottom: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #334155; /* text-slate-700 dark:text-slate-300 */
 }
 .form-control {
-  @apply w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700/50 transition-all duration-200 text-sm placeholder-slate-400 dark:placeholder-slate-500;
-  @apply focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20;
-  /* 針對 readonly/disabled 欄位，確保視覺上是不可編輯的 */
-  @apply disabled:bg-slate-100 disabled:opacity-70 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100; 
+  width: 100%;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  border-width: 1px;
+  border-color: #cbd5e1; /* border-slate-300 dark:border-slate-600 */
+  background-color: #ffffff; /* bg-white dark:bg-slate-700/50 */
+  transition: all 0.2s ease;
+  font-size: 0.875rem;
+  color: #1e293b; /* dark:text-slate-200 */
+  box-shadow: none;
 }
+.form-control:focus {
+  outline: none;
+  border-color: #3b82f6; /* focus:border-blue-500 */
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); /* focus:ring-2 focus:ring-blue-500/20 */
+}
+.form-control[readonly],
+.form-control:disabled {
+  background-color: #f1f5f9; /* disabled:bg-slate-100 */
+  opacity: 0.7; /* disabled:opacity-70 */
+  cursor: not-allowed;
+  color: #64748b; /* dark:disabled:text-slate-400 */
+}
+
 .btn-primary {
-  @apply inline-flex items-center justify-center px-4 py-2 rounded-xl font-medium transition-all duration-200 cursor-pointer bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  border-radius: 0.75rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  background-image: linear-gradient(to right, #3b82f6, #2563eb);
+  color: white;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+.btn-primary:hover:not(:disabled) {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  transform: translateY(-0.125rem);
 }
 .btn-secondary {
-  @apply inline-flex items-center justify-center px-4 py-2 rounded-xl font-medium transition-all duration-200 cursor-pointer bg-white dark:bg-slate-700 border border-slate-900/10 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600 disabled:opacity-60 disabled:cursor-not-allowed;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  border-radius: 0.75rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  background-color: white; /* dark:bg-slate-700 */
+  border-width: 1px;
+  border-color: rgba(15, 23, 42, 0.1); /* dark:border-slate-600 */
+  color: #475569; /* text-slate-700 dark:text-slate-200 */
+}
+.btn-secondary:hover:not(:disabled) {
+  background-color: #f8fafc; /* hover:bg-slate-50 dark:hover:bg-slate-600 */
 }
 </style>

@@ -1,21 +1,22 @@
 // src/router/index.js
 import { createRouter, createWebHistory } from 'vue-router'
-import { userStore } from '../store/user' //
+import { userStore } from '../store/user'
 import { watch } from 'vue'
 
-// Import Layouts and Views (保持不變)
-import AppLayout from '../views/AppLayout.vue' //
-import Login from '../views/Login.vue' //
-import Inspection from '../views/Inspection.vue' //
-import Admin from '../views/Admin.vue' //
-import AdminDashboard from '../views/admin/AdminDashboard.vue' //
-import ManageZones from '../views/admin/ManageZones.vue' //
-import ManageRooms from '../views/admin/ManageRooms.vue' //
-import ManageTypes from '../views/admin/ManageTypes.vue' //
-import ManageChecklist from '../views/admin/ManageChecklist.vue' //
-import ManageUsers from '../views/admin/ManageUsers.vue' //
+// Import Layouts and Views 
+import AppLayout from '../views/AppLayout.vue' 
+import Login from '../views/Login.vue' 
+import Inspection from '../views/Inspection.vue' 
+import Admin from '../views/Admin.vue' 
+import AdminDashboard from '../views/admin/AdminDashboard.vue' 
+import ManageZones from '../views/admin/ManageZones.vue' 
+import ManageRooms from '../views/admin/ManageRooms.vue' 
+import ManageTypes from '../views/admin/ManageTypes.vue' 
+import ManageChecklist from '../views/admin/ManageChecklist.vue' 
+import ManageUsers from '../views/admin/ManageUsers.vue' 
+import KeyReturn from '../views/KeyReturn.vue' // 新增 KeyReturn
 
-// routes (保持不變)
+// routes 
 const routes = [
   { path: '/login', name: 'Login', component: Login, meta: { title: '登入' } },
   {
@@ -24,6 +25,7 @@ const routes = [
     meta: { requiresAuth: true },
     children: [
       { path: '', name: 'Inspection', component: Inspection, meta: { title: '檢查模式' } },
+      { path: 'key-return', name: 'KeyReturn', component: KeyReturn, meta: { title: '鑰匙歸還' } }, // 新增歸還模式路由
       {
         path: 'admin',
         component: Admin,
@@ -42,31 +44,31 @@ const routes = [
   },
 ]
 
-// Create the router instance (保持不變)
+// Create the router instance 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes
 })
 
-// Navigation Guard: Checks authentication and authorization (保持不變)
+// Navigation Guard: Checks authentication and authorization 
 router.beforeEach(async (to, from, next) => {
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
   const requiresAdmin = to.matched.some(record => record.meta.requiresAdmin);
 
   const waitForAuth = () => {
     return new Promise((resolve) => {
-      if (!userStore.state.loading) { //
+      if (!userStore.state.loading) { 
         resolve();
         return;
       }
-      const unwatch = watch(() => userStore.state.loading, (isLoading) => { //
+      const unwatch = watch(() => userStore.state.loading, (isLoading) => { 
         if (!isLoading) {
           unwatch(); 
           resolve();
         }
       });
       setTimeout(() => {
-          if (userStore.state.loading) { //
+          if (userStore.state.loading) { 
               console.warn("路由守衛等待 Auth 超時，強制繼續");
               unwatch();
               resolve();
@@ -76,10 +78,10 @@ router.beforeEach(async (to, from, next) => {
   };
 
   await waitForAuth();
-  console.log("路由守衛：Auth 狀態已載入。Session:", userStore.state.session ? '存在' : '不存在', "Role:", userStore.state.role); //
+  console.log("路由守衛：Auth 狀態已載入。Session:", userStore.state.session ? '存在' : '不存在', "Role:", userStore.state.role); 
 
 
-  const { session, role } = userStore.state; //
+  const { session, role } = userStore.state; 
 
   if (requiresAuth && !session) {
     console.log("路由守衛：需要驗證，但未登入。重新導向到登入頁。");
