@@ -112,7 +112,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue' // nextTick 已引入
 import { supabase } from '@/services/supabase' 
 import { configStore } from '@/store/config' 
 import { userStore } from '@/store/user'
@@ -138,6 +138,7 @@ const isRoomCacheLoading = ref(true);
 
 const fetchAllRoomsCache = async () => {
     isRoomCacheLoading.value = true;
+    console.log("KeyReturn: 正在載入 rooms/zones 快取...");
     try {
         const [{ data: roomsData, error: roomError }, { data: zonesData, error: zoneError }] = await Promise.all([
              supabase.from('rooms').select('id, room_number, zone_id'),
@@ -152,8 +153,9 @@ const fetchAllRoomsCache = async () => {
             ...r,
             zone_name: zonesData.find(z => z.id === r.zone_id)?.name
         }));
+        console.log(`KeyReturn: rooms 快取載入成功，共 ${allRoomsCache.value.length} 筆資料。`);
     } catch (e) {
-        console.error("載入所有房間快取失敗:", e);
+        console.error("KeyReturn: 載入所有房間快取失敗:", e);
         showToast('載入房間列表快取失敗！', 'error');
     } finally {
         isRoomCacheLoading.value = false;
@@ -181,6 +183,7 @@ watch(studentId, (newId) => {
 
 const performStudentLookup = async (id) => {
     id = id.trim();
+    console.log(`KeyReturn: 正在查詢學號 ${id} 的分配記錄...`);
     if (isRoomCacheLoading.value) {
         lookupError.value = '房間資訊尚未載入，請稍候。';
         lookupLoading.value = false;
@@ -199,19 +202,34 @@ const performStudentLookup = async (id) => {
         .maybeSingle();
 
     if (allocationError) {
-        console.error("Allocation lookup error:", allocationError);
+        console.error("KeyReturn: Allocation lookup error:", allocationError);
         lookupError.value = `查詢失敗: ${allocationError.message}`;
         lookupLoading.value = false;
         return;
     }
 
     if (allocationData) {
+        console.log("KeyReturn: 找到分配記錄。Room ID:", allocationData.room_id, "Zone ID:", allocationData.zone_id);
         const roomMatch = allRoomsCache.value.find(r => r.id === allocationData.room_id);
 
         if (roomMatch) {
-            // 1. Update formState via emit (關鍵步驟)
-            emit('update:dormZone', allocationData.zone_id);
-            emit('update:roomNumber', allocationData.room_id);
+            console.log("KeyReturn: 房間 ID 在快取中匹配成功。房號:", roomMatch.room_number);
+            
+            // 步驟 1: 先更新 dormZone (這會在 AppLayout 觸發 roomNumber 的清空)
+            emit('update:dormZone', allocationData.zone_id); // MODIFIED
+            console.log("KeyReturn: Step 1 (Zone) emitted. Waiting for nextTick to set Room ID..."); // ADDED
+            
+            // 步驟 2: 在下一個微任務中，再更新正確的 roomNumber
+            nextTick(() => { // MODIFIED: 使用 nextTick
+                emit('update:roomNumber', allocationData.room_id); // MODIFIED
+                console.log("KeyReturn: Step 2 (Room) emitted in nextTick."); // ADDED
+                
+                // 再次 nextTick 檢查最終狀態
+                nextTick(() => { // ADDED: 額外的 nextTick 檢查
+                    console.log("KeyReturn: Final nextTick check. Current Room ID in formState should be:", props.formState.roomNumber); // ADDED
+                    console.log("KeyReturn: Final nextTick check. Current Room Number should be:", currentRoomNumber.value); // ADDED
+                });
+            });
             
             // 2. Update local bedNumber
             bedNumber.value = allocationData.bed_number;
@@ -219,10 +237,12 @@ const performStudentLookup = async (id) => {
             showToast(`學號 ${id} 的房間資訊已自動帶入！`, 'success');
         } else {
             // 查到分配紀錄，但房間 ID 無效 (資料不一致)
+            console.warn(`KeyReturn: 找到分配記錄 (Room ID: ${allocationData.room_id})，但在本地 rooms 快取中查無對應房號。`);
             lookupError.value = `找到分配記錄，但查無對應房號資訊。`;
             resetRoomInfo();
         }
     } else {
+        console.log("KeyReturn: 查無學號分配記錄。");
         lookupError.value = `查無學號 ${id} 的床位分配資訊。`;
         // 清空床位號，但不清除房間選擇（保留使用者手動選擇的狀態）
         bedNumber.value = ''; 
@@ -243,7 +263,20 @@ const currentZoneName = computed(() => {
 
 const currentRoomNumber = computed(() => {
     if (isRoomCacheLoading.value) return '載入中...';
-    return allRoomsCache.value.find(r => r.id === props.formState.roomNumber)?.room_number || '未選擇';
+    
+    const room = allRoomsCache.value.find(r => r.id === props.formState.roomNumber);
+    
+    if (room && room.room_number) {
+        // console.log("Computed: Room ID 匹配成功。顯示房號:", room.room_number); // REMOVED: 避免過多日誌
+        return room.room_number;
+    }
+    
+    // 如果 room ID 存在，但房號不存在，可能是資料問題，提供除錯訊息
+    if (props.formState.roomNumber) {
+        console.warn("Computed: Room ID 存在，但 rooms 快取中查無或 room_number 為空。Form ID:", props.formState.roomNumber);
+    }
+    
+    return '未選擇';
 });
 
 const missingInfoReason = computed(() => {
