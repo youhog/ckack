@@ -1,75 +1,148 @@
 <template>
-  <div class="container mx-auto max-w-lg py-8 min-h-screen flex items-center">
-    <div class="bg-white shadow-lg rounded-2xl p-8 w-full border border-gray-200">
-      <div class="flex items-center gap-4 mb-6 justify-center">
-          <div class="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white text-2xl shadow-lg">
-              🏠
+  <div class="night-gradient min-h-screen relative overflow-hidden">
+    <div class="stars absolute top-0 left-0 w-full h-full" id="stars"></div>
+
+    <main class="min-h-screen flex items-center justify-center px-4 py-12 relative z-10">
+      <div class="login-card rounded-2xl p-8 w-full max-w-md">
+        <div class="text-center mb-8">
+          <div class="text-4xl mb-4">🌙</div>
+          <h1 class="text-3xl font-bold text-white mb-2">宿舍檢查系統</h1>
+          <p class="text-blue-200">歡迎回來</p>
+        </div>
+
+        <form @submit.prevent="handleLogin" class="space-y-6">
+          <div>
+            <label for="account" class="block text-sm font-medium text-blue-100 mb-2">
+              帳號
+            </label>
+            <input
+              type="text"
+              id="account"
+              name="account"
+              required
+              v-model="email" class="input-glow w-full px-4 py-3 bg-white bg-opacity-10 border border-white border-opacity-30 rounded-lg text-white placeholder-blue-200 focus:outline-none focus:border-indigo-400 transition-all duration-300"
+              placeholder="請輸入帳號 (無需輸入 @網域)"
+            />
           </div>
-          <h1 class="text-3xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
-              宿舍檢查系統
-          </h1>
+
+          <div>
+            <label for="password" class="block text-sm font-medium text-blue-100 mb-2">
+              密碼
+            </label>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              required
+              v-model="password"
+              class="input-glow w-full px-4 py-3 bg-white bg-opacity-10 border border-white border-opacity-30 rounded-lg text-white placeholder-blue-200 focus:outline-none focus:border-indigo-400 transition-all duration-300"
+              placeholder="請輸入密碼"
+            />
+          </div>
+
+          <div v-if="errorMsg" class="p-3 rounded-lg bg-red-500 bg-opacity-20 border border-red-400 text-red-200 text-sm">
+            {{ errorMsg }}
+          </div>
+          <div v-if="successMsg" class="p-3 rounded-lg bg-green-500 bg-opacity-20 border border-green-400 text-green-200 text-sm">
+            {{ successMsg }}
+          </div>
+
+          <button
+            type="submit"
+            :disabled="loading"
+            class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
+          >
+             <span v-if="loading" class="flex items-center">
+                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                處理中...
+              </span>
+              <span v-else>立即登入</span>
+          </button>
+        </form>
+
+        <div class="mt-6 text-center">
+          <p class="text-blue-200 text-sm">
+            還沒有帳號？
+            <button @click="handleSignUp" :disabled="loading" class="font-medium text-indigo-300 hover:text-indigo-200 transition-colors disabled:opacity-70 disabled:cursor-not-allowed">
+              立即註冊
+            </button>
+          </p>
+        </div>
+
       </div>
-
-      <form @submit.prevent="handleLogin" class="space-y-4">
-        <div class="mb-4">
-          <label for="email" class="block mb-2 text-sm font-medium text-gray-700">電子郵件 (檢查人員)</label>
-          <input type="email" id="email" 
-                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-300 focus:border-indigo-500" 
-                 v-model="email" required placeholder="name@example.com">
-        </div>
-        <div class="mb-4">
-          <label for="password" class="block mb-2 text-sm font-medium text-gray-700">密碼</label>
-          <input type="password" id="password" 
-                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-300 focus:border-indigo-500" 
-                 v-model="password" required placeholder="••••••••">
-        </div>
-
-        <div v-if="errorMsg" class="text-red-600 text-center p-3 bg-red-100 rounded-lg text-sm">{{ errorMsg }}</div>
-        <div v-if="successMsg" class="text-green-600 text-center p-3 bg-green-100 rounded-lg text-sm">{{ successMsg }}</div>
-
-        <div class="flex flex-col sm:flex-row gap-4 pt-2">
-          <button type="submit" 
-                  class="w-full px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-opacity-75 disabled:opacity-50 disabled:cursor-not-allowed" 
-                  :disabled="loading">
-            {{ loading ? '登入中...' : '登入' }}
-          </button>
-          <button type="button" @click="handleSignUp" 
-                  class="w-full px-6 py-3 bg-gray-200 text-gray-800 font-semibold rounded-lg shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75 disabled:opacity-50 disabled:cursor-not-allowed" 
-                  :disabled="loading">
-            {{ loading ? '註冊中...' : '註冊新帳號' }}
-          </button>
-        </div>
-      </form>
-    </div>
+    </main>
   </div>
 </template>
 
 <script setup>
-// Script 部分保持不變
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { supabase } from '../services/supabase'
+import { supabase } from '../services/supabase' //
+// 假設您已經建立了 constants.js 檔案
+import { DEFAULT_EMAIL_DOMAIN } from '../utils/constants'
 
+// --- Star Animation Logic ---
+function createStars() {
+  const starsContainer = document.getElementById('stars');
+  if (!starsContainer) return;
+  starsContainer.innerHTML = '';
+  const numberOfStars = 50;
+
+  for (let i = 0; i < numberOfStars; i++) {
+    const star = document.createElement('div');
+    star.className = 'star';
+    star.style.left = Math.random() * 100 + '%';
+    star.style.top = Math.random() * 100 + '%';
+    star.style.width = Math.random() * 3 + 1 + 'px';
+    star.style.height = star.style.width;
+    star.style.animationDelay = Math.random() * 2 + 's';
+    star.style.animationDuration = (Math.random() * 3 + 2) + 's';
+    starsContainer.appendChild(star);
+  }
+}
+
+// --- Vue Component Logic ---
 const router = useRouter()
-const email = ref('')
+const email = ref('') // 雖然 Label 改了，但變數名稱保持 email，因為後端 API 仍需要 Email 格式
 const password = ref('')
 const loading = ref(false)
 const errorMsg = ref(null)
 const successMsg = ref(null)
 
+// Call createStars when the component is mounted
+onMounted(() => {
+  createStars();
+});
+
+// Helper function to format email
+const formatEmail = (inputEmail) => {
+  // 檢查 DEFAULT_EMAIL_DOMAIN 是否已定義且為字串
+  const domain = typeof DEFAULT_EMAIL_DOMAIN === 'string' ? DEFAULT_EMAIL_DOMAIN : '';
+  if (inputEmail && !inputEmail.includes('@') && domain) {
+    return inputEmail + domain; // Append default domain if '@' is missing
+  }
+  return inputEmail; // Return original if it already has '@' or is empty or domain is invalid
+};
+
+
 const handleLogin = async () => {
   loading.value = true
   errorMsg.value = null
   successMsg.value = null
+  const finalEmail = formatEmail(email.value);
+
   const { error } = await supabase.auth.signInWithPassword({
-    email: email.value,
+    email: finalEmail,
     password: password.value,
   })
   if (error) {
     errorMsg.value = `登入失敗: ${error.message}`
     console.error("Login error:", error);
   } else {
-    // 登入成功後，路由守衛會處理跳轉
+    router.push({ name: 'Inspection' }); // Explicit redirect on success
   }
   loading.value = false
 }
@@ -78,6 +151,13 @@ const handleSignUp = async () => {
   loading.value = true
   errorMsg.value = null
   successMsg.value = null
+  const finalEmail = formatEmail(email.value);
+
+  if (!finalEmail || !password.value) {
+    errorMsg.value = '帳號和密碼不能為空。' // 【修改】錯誤訊息
+    loading.value = false
+    return
+  }
 
   if (password.value.length < 6) {
     errorMsg.value = '註冊失敗：密碼長度至少需要 6 個字元。'
@@ -86,116 +166,60 @@ const handleSignUp = async () => {
   }
 
   const { error } = await supabase.auth.signUp({
-    email: email.value,
+    email: finalEmail,
     password: password.value,
   })
   if (error) {
     errorMsg.value = `註冊失敗: ${error.message}`
      console.error("Signup error:", error);
   } else {
-    successMsg.value = '註冊成功！請直接使用此帳號密碼登入。'
-    password.value = '';
-  }
-  loading.value = false
-}
-</script><template>
-  <div class="container mx-auto max-w-lg py-8 min-h-screen flex items-center">
-    <div class="bg-white shadow-lg rounded-2xl p-8 w-full border border-gray-200">
-      <div class="flex items-center gap-4 mb-6 justify-center">
-          <div class="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white text-2xl shadow-lg">
-              🏠
-          </div>
-          <h1 class="text-3xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
-              宿舍檢查系統
-          </h1>
-      </div>
-
-      <form @submit.prevent="handleLogin" class="space-y-4">
-        <div class="mb-4">
-          <label for="email" class="block mb-2 text-sm font-medium text-gray-700">電子郵件 (檢查人員)</label>
-          <input type="email" id="email" 
-                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-300 focus:border-indigo-500" 
-                 v-model="email" required placeholder="name@example.com">
-        </div>
-        <div class="mb-4">
-          <label for="password" class="block mb-2 text-sm font-medium text-gray-700">密碼</label>
-          <input type="password" id="password" 
-                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-300 focus:border-indigo-500" 
-                 v-model="password" required placeholder="••••••••">
-        </div>
-
-        <div v-if="errorMsg" class="text-red-600 text-center p-3 bg-red-100 rounded-lg text-sm">{{ errorMsg }}</div>
-        <div v-if="successMsg" class="text-green-600 text-center p-3 bg-green-100 rounded-lg text-sm">{{ successMsg }}</div>
-
-        <div class="flex flex-col sm:flex-row gap-4 pt-2">
-          <button type="submit" 
-                  class="w-full px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-opacity-75 disabled:opacity-50 disabled:cursor-not-allowed" 
-                  :disabled="loading">
-            {{ loading ? '登入中...' : '登入' }}
-          </button>
-          <button type="button" @click="handleSignUp" 
-                  class="w-full px-6 py-3 bg-gray-200 text-gray-800 font-semibold rounded-lg shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75 disabled:opacity-50 disabled:cursor-not-allowed" 
-                  :disabled="loading">
-            {{ loading ? '註冊中...' : '註冊新帳號' }}
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-</template>
-
-<script setup>
-// Script 部分保持不變
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { supabase } from '../services/supabase'
-
-const router = useRouter()
-const email = ref('')
-const password = ref('')
-const loading = ref(false)
-const errorMsg = ref(null)
-const successMsg = ref(null)
-
-const handleLogin = async () => {
-  loading.value = true
-  errorMsg.value = null
-  successMsg.value = null
-  const { error } = await supabase.auth.signInWithPassword({
-    email: email.value,
-    password: password.value,
-  })
-  if (error) {
-    errorMsg.value = `登入失敗: ${error.message}`
-    console.error("Login error:", error);
-  } else {
-    // 登入成功後，路由守衛會處理跳轉
-  }
-  loading.value = false
-}
-
-const handleSignUp = async () => {
-  loading.value = true
-  errorMsg.value = null
-  successMsg.value = null
-
-  if (password.value.length < 6) {
-    errorMsg.value = '註冊失敗：密碼長度至少需要 6 個字元。'
-    loading.value = false
-    return
-  }
-
-  const { error } = await supabase.auth.signUp({
-    email: email.value,
-    password: password.value,
-  })
-  if (error) {
-    errorMsg.value = `註冊失敗: ${error.message}`
-     console.error("Signup error:", error);
-  } else {
-    successMsg.value = '註冊成功！請直接使用此帳號密碼登入。'
+    successMsg.value = '註冊請求已送出！請檢查您的電子郵件以完成驗證，然後即可登入。'
     password.value = '';
   }
   loading.value = false
 }
 </script>
+
+<style scoped>
+/* Scoped styles specific to this component */
+.night-gradient {
+  background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+}
+
+.stars {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none; /* Make sure stars don't block interaction */
+}
+
+/* Star styles need to be defined outside of @keyframes for JS access */
+.star {
+    position: absolute;
+    background: white;
+    border-radius: 50%;
+    animation-name: twinkle;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+.login-card {
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); /* Add a subtle shadow */
+}
+
+.input-glow:focus {
+  box-shadow: 0 0 15px rgba(99, 102, 241, 0.4); /* Slightly softer glow */
+  border-color: rgba(99, 102, 241, 0.7); /* Match glow color */
+}
+</style>
