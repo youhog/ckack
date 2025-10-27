@@ -16,14 +16,17 @@
           </div>
           <div class="flex gap-3 w-full lg:w-auto">
               <button
-                @click="handleLogout" title="登出"
-                class="btn-secondary" >
+                @click="handleLogout" 
+                title="登出"
+                class="btn-secondary"
+              >
                 <span class="flex items-center gap-2">🚪 <span class="hidden sm:inline">登出</span></span>
               </button>
 
               <button
                 @click="$emit('navigate', 'inspection')"
-                :class="view === 'inspection' ? 'btn-primary' : 'btn-secondary'" class="flex-1 lg:flex-none"
+                :class="view === 'inspection' ? 'btn-primary' : 'btn-secondary'"
+                class="flex-1 lg:flex-none"
               >
                 <span class="flex items-center gap-2">📋 <span>檢查模式</span></span>
               </button>
@@ -31,7 +34,8 @@
               <button
                 v-if="userRole === 'admin'"
                 @click="$emit('navigate', 'admin')"
-                :class="view === 'admin' ? 'btn-primary' : 'btn-secondary'" class="flex-1 lg:flex-none"
+                :class="view === 'admin' ? 'btn-primary' : 'btn-secondary'"
+                class="flex-1 lg:flex-none"
               >
                 <span class="flex items-center gap-2">⚙️ <span>後台管理</span></span>
               </button>
@@ -47,7 +51,7 @@
                 id="dormZone"
                 class="form-control"
                 :value="dormZone"
-                @input="$emit('update:dormZone', $event.target.value)"
+                @change="onZoneChange($event.target.value)"
               >
                   <option value="">請選擇分區</option>
                   <option v-for="zone in config.zones" :key="zone.id" :value="zone.id">
@@ -60,25 +64,22 @@
                <label for="roomNumber" class="form-label">
                   <div class="flex justify-between items-center w-full">
                     <span class="flex items-center gap-1">🚪 <span>房間號碼</span></span>
-                    <span v-if="validationState === 'loading'" class="text-xs text-slate-500 dark:text-slate-400">驗證中...</span>
-                    <span v-if="validationState === 'valid'" class="text-xs text-green-600 dark:text-green-400">✅ 正確</span>
-                    <span v-if="validationState === 'invalid'" class="text-xs text-red-500 dark:text-red-400">❌ 無此房號</span>
-                  </div>
+                    <span v-if="loadingRooms" class="text-xs text-slate-500 dark:text-slate-400">載入中...</span>
+                    </div>
               </label>
-              <input
-                type="text"
+              <select
                 id="roomNumber"
                 class="form-control"
-                :class="{
-                    'border-green-500 focus:border-green-500 focus:ring-green-500/20': validationState === 'valid',
-                    'border-red-500 focus:border-red-500 focus:ring-red-500/20': validationState === 'invalid'
-                }"
-                :value="roomNumberInput"
-                @input="$emit('update:roomNumberInput', $event.target.value)"
-                @blur="validateRoom"
-                :disabled="!dormZone"
-                placeholder="請先選分區，再輸入房號"
+                :value="roomNumber"
+                @change="$emit('update:roomNumber', $event.target.value)"
+                :disabled="!dormZone || availableRooms.length === 0 || loadingRooms"
               >
+                 <option value="">請選擇房號</option>
+                 <option v-for="room in availableRooms" :key="room.id" :value="room.id">
+                  {{ room.room_number }}
+                </option>
+              </select>
+              <input type="hidden" :value="roomNumberInput" @input="$emit('update:roomNumberInput', $event.target.value)">
           </div>
           <div>
               <label for="checkType" class="form-label flex items-center gap-1">
@@ -88,7 +89,7 @@
                 id="checkType"
                 class="form-control"
                 :value="checkType"
-                @input="$emit('update:checkType', $event.target.value)"
+                @change="$emit('update:checkType', $event.target.value)"
               >
                  <option value="">請選擇類型</option>
                  <option v-for="type in config.checkTypes" :key="type.id" :value="type.id">
@@ -107,6 +108,8 @@
                 placeholder="請輸入姓名"
                 :value="inspector"
                 @input="$emit('update:inspector', $event.target.value)"
+                readonly
+                disabled
               >
           </div>
       </div>
@@ -147,17 +150,18 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue' // <-- 加入 ref
+import { computed, ref, watch } from 'vue' //
 import { useRouter } from 'vue-router'
 import { supabase } from '../services/supabase' //
 import { userStore } from '../store/user' //
 import { configStore } from '../store/config' //
-import ConfirmModal from './ConfirmModal.vue'; // <-- 1. 匯入組件
+import ConfirmModal from './ConfirmModal.vue'; 
+import { showToast } from '@/utils'; // 引入 showToast
 
 const props = defineProps({
   dormZone: String,
-  roomNumber: String,
-  roomNumberInput: String,
+  roomNumber: String, // 這是 room.id
+  roomNumberInput: String, // 這是輸入框的文字 (現在是隱藏的)
   checkType: String,
   inspector: String,
   view: String,
@@ -169,58 +173,63 @@ const user = userStore.state.user //
 const userEmail = computed(() => user?.email || '訪客')
 const userRole = computed(() => userStore.state.role) //
 const config = configStore.state //
-const showLogoutConfirm = ref(false); // <-- 2. 加入 modal 狀態
 
-// 3. 修改 handleLogout，只負責打開 modal
+const showLogoutConfirm = ref(false); 
+const allRooms = ref([]); // 所有房間的本地快取
+const loadingRooms = ref(false);
+
+// *** 新增: 獲取所有房間列表 (一次性載入) ***
+const fetchAllRooms = async () => {
+    loadingRooms.value = true;
+    try {
+        // 從資料庫獲取所有房間資料
+        const { data, error } = await supabase //
+            .from('rooms') //
+            .select('id, zone_id, room_number')
+            .order('room_number', { ascending: true });
+
+        if (error) throw error;
+        allRooms.value = data || [];
+    } catch (e) {
+        console.error("載入所有房間失敗:", e);
+        showToast('載入房間列表失敗！', 'error');
+    } finally {
+        loadingRooms.value = false;
+    }
+}
+// 應用程式啟動時載入房間
+fetchAllRooms();
+
+
+// *** 修改 1.1: 根據選擇的區域篩選房間列表 ***
+const availableRooms = computed(() => {
+    if (!props.dormZone) return [];
+    return allRooms.value
+        .filter(room => room.zone_id === props.dormZone)
+        .sort((a, b) => a.room_number.localeCompare(b.room_number)); // 確保排序
+});
+
+// *** 修改 1.2: 處理區域變化並重設房號 ***
+const onZoneChange = (newZoneId) => {
+    emit('update:dormZone', newZoneId);
+    // 重設 roomNumber 和 roomNumberInput (AppLayout.vue 也有類似邏輯，但這裡確保立即反應)
+    emit('update:roomNumber', '');
+    emit('update:roomNumberInput', ''); 
+}
+
+
+// --- 登出邏輯 (使用 Modal) ---
 const handleLogout = () => {
   showLogoutConfirm.value = true;
 }
 
-// 4. 新增實際執行的函數
 const executeLogout = async () => {
   const { error } = await supabase.auth.signOut() //
   if (!error) {
     router.push({ name: 'Login' }) //
   } else {
     console.error("登出失敗:", error);
-    // showToast('登出失敗，請稍後再試。', 'error');
   }
-}
-
-// --- Room validation logic ---
-const validationState = ref('idle');
-watch(() => props.dormZone, () => { validationState.value = 'idle'; });
-watch(() => props.roomNumberInput, (newInput) => {
-    if (validationState.value !== 'idle') validationState.value = 'idle';
-    if (props.roomNumber) emit('update:roomNumber', '');
-});
-const validateRoom = async () => {
-    const zoneId = props.dormZone;
-    const roomInput = props.roomNumberInput ? props.roomNumberInput.trim() : '';
-    if (!zoneId || !roomInput) {
-        validationState.value = 'idle';
-        emit('update:roomNumber', '');
-        return;
-    }
-    validationState.value = 'loading';
-    try {
-        const { data, error } = await supabase //
-            .from('rooms') //
-            .select('id')
-            .eq('zone_id', zoneId)
-            .eq('room_number', roomInput)
-            .single();
-        if (error || !data) {
-            validationState.value = 'invalid';
-            emit('update:roomNumber', '');
-        } else {
-            validationState.value = 'valid';
-            emit('update:roomNumber', data.id);
-        }
-    } catch (e) {
-        validationState.value = 'invalid';
-        emit('update:roomNumber', '');
-    }
 }
 
 // --- Progress class logic ---
@@ -241,7 +250,8 @@ const progressClass = computed(() => {
 .form-control {
   @apply w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700/50 transition-all duration-200 text-sm placeholder-slate-400 dark:placeholder-slate-500;
   @apply focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20;
-  @apply disabled:bg-slate-100 disabled:opacity-70 dark:disabled:bg-slate-700 dark:disabled:opacity-50;
+  /* 針對 readonly/disabled 欄位，確保視覺上是不可編輯的 */
+  @apply disabled:bg-slate-100 disabled:opacity-70 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100; 
 }
 .btn-primary {
   @apply inline-flex items-center justify-center px-4 py-2 rounded-xl font-medium transition-all duration-200 cursor-pointer bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed;
