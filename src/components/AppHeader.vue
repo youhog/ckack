@@ -244,70 +244,20 @@ const progressClass = computed(() => {
 </script>
 
 <style scoped>
+/* Define reusable styles using @apply */
 .form-label {
-  display: block;
-  margin-bottom: 0.375rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #334155; /* text-slate-700 dark:text-slate-300 */
+  @apply block mb-1.5 text-sm font-medium text-slate-700 dark:text-slate-300;
 }
 .form-control {
-  width: 100%;
-  padding: 0.5rem 1rem;
-  border-radius: 0.5rem;
-  border-width: 1px;
-  border-color: #cbd5e1; /* border-slate-300 dark:border-slate-600 */
-  background-color: #ffffff; /* bg-white dark:bg-slate-700/50 */
-  transition: all 0.2s ease;
-  font-size: 0.875rem;
-  color: #1e293b; /* dark:text-slate-200 */
-  box-shadow: none;
+  @apply w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700/50 transition-all duration-200 text-sm placeholder-slate-400 dark:placeholder-slate-500 text-slate-800 dark:text-slate-200;
+  @apply focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20;
+  /* 針對 readonly/disabled 欄位，優化深色模式下的對比度 */
+  @apply disabled:bg-slate-100 disabled:opacity-100 dark:disabled:bg-slate-700 dark:disabled:text-slate-400; 
 }
-.form-control:focus {
-  outline: none;
-  border-color: #3b82f6; /* focus:border-blue-500 */
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); /* focus:ring-2 focus:ring-blue-500/20 */
-}
-.form-control[readonly],
-.form-control:disabled {
-  background-color: #f1f5f9; /* disabled:bg-slate-100 */
-  opacity: 0.7; /* disabled:opacity-70 */
-  cursor: not-allowed;
-  color: #64748b; /* dark:disabled:text-slate-400 */
-}
-
 .btn-primary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.5rem 1rem;
-  border-radius: 0.75rem;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  cursor: pointer;
-  background-image: linear-gradient(to right, #3b82f6, #2563eb);
-  color: white;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-}
-.btn-primary:hover:not(:disabled) {
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  transform: translateY(-0.125rem);
+  @apply inline-flex items-center justify-center px-4 py-2 rounded-xl font-medium transition-all duration-200 cursor-pointer bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed;
 }
 .btn-secondary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.5rem 1rem;
-  border-radius: 0.75rem;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  cursor: pointer;
-  background-color: white; /* dark:bg-slate-700 */
-  border-width: 1px;
-  border-color: rgba(15, 23, 42, 0.1); /* dark:border-slate-600 */
-  color: #475569; /* text-slate-700 dark:text-slate-200 */
-}
-.btn-secondary:hover:not(:disabled) {
-  background-color: #f8fafc; /* hover:bg-slate-50 dark:hover:bg-slate-600 */
+  @apply inline-flex items-center justify-center px-4 py-2 rounded-xl font-medium transition-all duration-200 cursor-pointer bg-white dark:bg-slate-700 border border-slate-900/10 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600 disabled:opacity-60 disabled:cursor-not-allowed;
 }
 </style>

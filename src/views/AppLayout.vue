@@ -18,6 +18,8 @@
           :progress="inspectionProgress"
           @report-generated="onReportGenerated"
           @checklist-updated="updateInspectionProgress"
+          @update:dormZone="(val) => formState.dormZone = val"    
+          @update:roomNumber="(val) => formState.roomNumber = val"  
         />
     </router-view>
   </div>
@@ -36,8 +38,8 @@ const user = userStore.state.user
 // 將表單狀態提升到佈局層
 const formState = reactive({
   dormZone: '', 
-  roomNumber: '', 
-  roomNumberInput: '', 
+  roomNumber: '', // 儲存選中的 room.id (UUID)
+  roomNumberInput: '', // 保留但實際上已不再使用 (AppHeader已移除)
   checkType: '', 
   inspector: user?.email ? user.email.split('@')[0] : '',
 })

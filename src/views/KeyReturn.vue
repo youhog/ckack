@@ -9,10 +9,24 @@
       </div>
       
       <p class="text-slate-500 dark:text-slate-400 mb-6">
-          請在上方選單選擇「宿舍分區」和「房間號碼」，然後填寫下方歸還資訊。
+          請在上方選單選擇「宿舍分區」和「房間號碼」，或輸入學生學號自動帶入。
       </p>
 
       <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+          <div class="col-span-4">
+              <label for="studentId" class="form-label">
+                  👤 <span>學生學號 (選填)</span>
+              </label>
+              <input 
+                type="text" 
+                id="studentId" 
+                class="form-control" 
+                placeholder="請輸入學號自動帶入房間資訊"
+                v-model="studentId" 
+              >
+              <p v-if="lookupError" class="text-sm text-red-500 dark:text-red-400 mt-1">{{ lookupError }}</p>
+          </div>
+
           <div class="col-span-2">
               <label for="currentZone" class="form-label flex items-center gap-1">
                   🏢 <span>所選區域</span>
@@ -24,6 +38,7 @@
                 :value="currentZoneName" 
                 disabled 
               >
+              <p v-if="!formState.dormZone" class="text-sm text-red-500 dark:text-red-400 mt-1">請在上方選單選擇分區。</p>
           </div>
           <div class="col-span-2">
                <label for="currentRoom" class="form-label">
@@ -36,20 +51,9 @@
                 :value="currentRoomNumber" 
                 disabled 
               >
+              <p v-if="!formState.roomNumber" class="text-sm text-red-500 dark:text-red-400 mt-1">請在上方選單選擇房號。</p>
           </div>
 
-          <div>
-              <label for="studentId" class="form-label">
-                  👤 <span>學生學號 (選填)</span>
-              </label>
-              <input 
-                type="text" 
-                id="studentId" 
-                class="form-control" 
-                placeholder="請輸入學號"
-                v-model="studentId" 
-              >
-          </div>
           <div>
               <label for="bedNumber" class="form-label">
                   🛏️ <span>床位號碼 (選填)</span>
@@ -58,6 +62,7 @@
                 id="bedNumber" 
                 class="form-control" 
                 v-model="bedNumber"
+                :disabled="lookupLoading"
               >
                  <option value="">未選擇</option>
                  <option value="1">1 號床</option>
@@ -66,7 +71,7 @@
                  <option value="4">4 號床</option>
               </select>
           </div>
-          </div>
+      </div>
 
       <div class="mb-6">
           <label for="returnNotes" class="form-label">
@@ -107,7 +112,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { supabase } from '@/services/supabase' 
 import { configStore } from '@/store/config' 
 import { userStore } from '@/store/user'
@@ -116,11 +121,14 @@ import { showToast } from '@/utils'
 const props = defineProps({
   formState: Object,
 })
+const emit = defineEmits(['update:dormZone', 'update:roomNumber'])
 
 const isLogging = ref(false)
 const returnNotes = ref('')
 const studentId = ref('') 
 const bedNumber = ref('') 
+const lookupLoading = ref(false);
+const lookupError = ref(null);
 
 const config = configStore.state
 const user = userStore.state.user
@@ -131,12 +139,19 @@ const isRoomCacheLoading = ref(true);
 const fetchAllRoomsCache = async () => {
     isRoomCacheLoading.value = true;
     try {
-        const { data, error } = await supabase
-            .from('rooms')
-            .select('id, room_number');
+        const [{ data: roomsData, error: roomError }, { data: zonesData, error: zoneError }] = await Promise.all([
+             supabase.from('rooms').select('id, room_number, zone_id'),
+             supabase.from('dorm_zones').select('id, name')
+        ]);
 
-        if (error) throw error;
-        allRoomsCache.value = data || [];
+        if (roomError) throw roomError;
+        if (zoneError) throw zoneError;
+
+        allRoomsCache.value = roomsData || [];
+        allRoomsCache.value = allRoomsCache.value.map(r => ({
+            ...r,
+            zone_name: zonesData.find(z => z.id === r.zone_id)?.name
+        }));
     } catch (e) {
         console.error("載入所有房間快取失敗:", e);
         showToast('載入房間列表快取失敗！', 'error');
@@ -146,6 +161,81 @@ const fetchAllRoomsCache = async () => {
 }
 
 onMounted(fetchAllRoomsCache);
+
+// --- Student ID Lookup Logic (Updated to query student_allocations) ---
+let lookupDebounce = null;
+watch(studentId, (newId) => {
+    lookupError.value = null;
+    if (newId.trim().length === 0) {
+        // 清空學號時，清空床位號
+        bedNumber.value = '';
+        return;
+    }
+    
+    clearTimeout(lookupDebounce);
+    lookupLoading.value = true;
+    lookupDebounce = setTimeout(() => {
+        performStudentLookup(newId);
+    }, 500); 
+});
+
+const performStudentLookup = async (id) => {
+    id = id.trim();
+    if (isRoomCacheLoading.value) {
+        lookupError.value = '房間資訊尚未載入，請稍候。';
+        lookupLoading.value = false;
+        return;
+    }
+    
+    // 1. Query the student_allocations table
+    const { data: allocationData, error: allocationError } = await supabase
+        .from('student_allocations')
+        .select(`
+            room_id, 
+            zone_id, 
+            bed_number
+        `)
+        .eq('student_id', id)
+        .maybeSingle();
+
+    if (allocationError) {
+        console.error("Allocation lookup error:", allocationError);
+        lookupError.value = `查詢失敗: ${allocationError.message}`;
+        lookupLoading.value = false;
+        return;
+    }
+
+    if (allocationData) {
+        const roomMatch = allRoomsCache.value.find(r => r.id === allocationData.room_id);
+
+        if (roomMatch) {
+            // 1. Update formState via emit (關鍵步驟)
+            emit('update:dormZone', allocationData.zone_id);
+            emit('update:roomNumber', allocationData.room_id);
+            
+            // 2. Update local bedNumber
+            bedNumber.value = allocationData.bed_number;
+            lookupError.value = null;
+            showToast(`學號 ${id} 的房間資訊已自動帶入！`, 'success');
+        } else {
+            // 查到分配紀錄，但房間 ID 無效 (資料不一致)
+            lookupError.value = `找到分配記錄，但查無對應房號資訊。`;
+            resetRoomInfo();
+        }
+    } else {
+        lookupError.value = `查無學號 ${id} 的床位分配資訊。`;
+        // 清空床位號，但不清除房間選擇（保留使用者手動選擇的狀態）
+        bedNumber.value = ''; 
+    }
+    lookupLoading.value = false;
+};
+
+const resetRoomInfo = () => {
+    emit('update:dormZone', '');
+    emit('update:roomNumber', '');
+}
+// --- End Student ID Lookup Logic ---
+
 
 const currentZoneName = computed(() => {
     return config.zones.find(z => z.id === props.formState.dormZone)?.name || '未選擇';
@@ -163,7 +253,7 @@ const missingInfoReason = computed(() => {
 });
 
 const isLogDisabled = computed(() => {
-    return isLogging.value || isRoomCacheLoading.value || !!missingInfoReason.value;
+    return isLogging.value || isRoomCacheLoading.value || lookupLoading.value || !!missingInfoReason.value;
 });
 
 const logKeyReturn = async () => {
@@ -175,7 +265,7 @@ const logKeyReturn = async () => {
     const sId = studentId.value.trim();
     const bNum = bedNumber.value.trim();
 
-    // 提示：若未填寫學號或床位，讓使用者確認
+    // Secondary check if student/bed info is missing
     if (!sId && !bNum) {
         if (!confirm(`您沒有輸入學號或床位號碼。確定要繼續記錄 ${currentRoomNumber.value} 的歸還嗎？`)) {
             return;
@@ -208,6 +298,8 @@ const logKeyReturn = async () => {
         returnNotes.value = '';
         studentId.value = '';
         bedNumber.value = '';
+        lookupError.value = null; 
+        resetRoomInfo(); // 清空上方選單
     }
     
     isLogging.value = false;
@@ -216,32 +308,13 @@ const logKeyReturn = async () => {
 
 <style scoped>
 .form-label {
-  display: block;
-  margin-bottom: 0.375rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #334155; /* dark:text-slate-300 */
+  @apply block mb-1.5 text-sm font-medium text-slate-700 dark:text-slate-300;
 }
 .form-control {
-  width: 100%;
-  padding: 0.5rem 1rem;
-  border-radius: 0.5rem;
-  border-width: 1px;
-  border-color: #cbd5e1; /* dark:border-slate-600 */
-  background-color: #ffffff; /* dark:bg-slate-700/50 */
-  transition: all 0.2s ease;
-  font-size: 0.875rem;
-  color: #1e293b; /* dark:text-slate-200 */
-  box-shadow: none;
+  @apply w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 transition-all duration-200 text-sm placeholder-slate-400 dark:placeholder-slate-500 text-slate-800 dark:text-slate-200;
+  @apply focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20;
 }
-.form-control:focus {
-  outline: none;
-  border-color: #3b82f6; /* focus:border-blue-500 */
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); /* focus:ring-2 focus:ring-blue-500/20 */
-}
-.form-control.disabled, .form-control[disabled] {
-  background-color: #f1f5f9; /* disabled:bg-slate-100 */
-  opacity: 0.7; /* disabled:opacity-70 */
-  cursor: not-allowed;
+.form-control[disabled] {
+  @apply bg-slate-100 dark:bg-slate-700 disabled:opacity-100 dark:text-slate-400; 
 }
 </style>
