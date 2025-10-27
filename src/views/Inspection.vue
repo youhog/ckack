@@ -139,6 +139,16 @@
             </button>
         </div>
     </div>
+    
+    <ConfirmModal // ADDED: 引入自定義 ConfirmModal 元件
+      v-model="showMarkAllGoodConfirm" // ADDED: 綁定顯示狀態
+      title="確認標記全部良好" // ADDED
+      :message="markAllGoodConfirmMessage" // ADDED: 綁定計算屬性
+      confirm-text="確定標記" // ADDED
+      confirm-variant="primary" // ADDED
+      @confirm="executeMarkAllGood" // ADDED: 綁定確認執行的函式
+      @cancel="showMarkAllGoodConfirm = false" // ADDED: 綁定取消關閉狀態
+    /> // END ADDED
   </main>
 </template>
 
@@ -149,6 +159,7 @@ import { userStore } from '@/store/user' //
 import { configStore } from '@/store/config' //
 import { escapeHTML, showToast } from '@/utils/index.js' //
 import Checklist from '@/components/Checklist.vue' //
+import ConfirmModal from '@/components/ConfirmModal.vue' // ADDED: 引入 ConfirmModal
 
 const props = defineProps({
   formState: Object
@@ -171,6 +182,13 @@ const OCCUPANCY_COUNT = 4; // Max occupancy for standard room
 const SUFFIXES = ['-1', '-2', '-3', '-4']; 
 const OCCUPANT_LABELS = ['1 號床', '2 號床', '3 號床', '4 號床'];
 // *** END MODIFIED CONSTANTS ***
+
+// ADDED: 處理 Mark All Good 確認對話框的狀態
+const showMarkAllGoodConfirm = ref(false); 
+const markAllGoodConfirmMessage = computed(() => { // ADDED: 動態生成訊息
+    return `確定要將剩餘的 ${summary.value.pendingCount} 個項目標記為「良好」嗎？`
+});
+// END ADDED
 
 const isPerPersonCategory = (categoryId) => {
     const category = config.checklistCategories.find(c => c.id === categoryId); //
@@ -365,16 +383,9 @@ const isGenerateDisabled = computed(() => {
 });
 
 
-const markAllGood = () => {
-    if (summary.value.pendingCount === 0) {
-        showToast('所有項目均已檢查完畢。', 'info'); //
-        return;
-    }
+const executeMarkAllGood = () => { // ADDED: 將核心邏輯獨立成一個函式
+    const pendingCount = summary.value.pendingCount;
     
-    if (!confirm(`確定要將剩餘的 ${summary.value.pendingCount} 個項目標記為「良好」嗎？`)) {
-        return;
-    }
-
     const newCheckData = { ...checkData.value };
     const newNotesData = { ...notesData.value };
     const newPhotoData = { ...photoData.value };
@@ -393,7 +404,19 @@ const markAllGood = () => {
     notesData.value = newNotesData;
     photoData.value = newPhotoData;
     
-    showToast('所有未檢查項目已標記為良好！', 'success'); //
+    showToast(`所有 ${pendingCount} 個未檢查項目已標記為良好！`, 'success'); //
+} // END ADDED
+
+const markAllGood = () => { // MODIFIED: 更新 markAllGood 函式
+    if (summary.value.pendingCount === 0) {
+        showToast('所有項目均已檢查完畢。', 'info'); //
+        return;
+    }
+    
+    // // REMOVED: if (!confirm(`確定要將剩餘的 ${summary.value.pendingCount} 個項目標記為「良好」嗎？`)) {
+    // // REMOVED:     return;
+    // // REMOVED: }
+    showMarkAllGoodConfirm.value = true; // MODIFIED: 改為顯示自定義 ConfirmModal
 }
 
 
