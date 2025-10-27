@@ -11,11 +11,10 @@
       <ChecklistItem
         v-for="item in items"
         :key="item.id"
-        :item-id="item.id"  
+        :item-id="item.id"
         :item-name="item.name"
-        :status="checkData[item.id] || 'pending'"
-        :notes="notesData[item.id] || ''"
-        :photo-url="photoData[item.id] || null"
+        :is-per-person="isPerPerson" :status="checkData[item.id] || 'pending'"
+        :notes-object="notesData[item.id]" :photo-url="photoData[item.id] || null"
         @update:status="updateStatus"
         @update:notes="updateNotes"
         @update:photo="updatePhoto"
@@ -27,10 +26,10 @@
 <script setup>
 import ChecklistItem from './ChecklistItem.vue' //
 
-// --- (所有 <script> 邏輯保持不變) ---
 const props = defineProps({
   category: Object,
   items: Array,
+  isPerPerson: Boolean, // *** NEW PROP ***
   checkData: Object,
   notesData: Object,
   photoData: Object
@@ -38,16 +37,19 @@ const props = defineProps({
 
 const emit = defineEmits(['update:checkData', 'update:notesData', 'update:photoData'])
 
+// 狀態更新 (簡單覆蓋)
 const updateStatus = ({ itemId, status }) => {
   const newCheckData = { ...props.checkData, [itemId]: status }
   emit('update:checkData', newCheckData)
 }
 
+// 備註更新 (傳遞複雜物件，適用於個人項目)
 const updateNotes = ({ itemId, notes }) => {
   const newNotesData = { ...props.notesData, [itemId]: notes }
   emit('update:notesData', newNotesData)
 }
 
+// 照片更新 (簡單覆蓋)
 const updatePhoto = ({ itemId, url }) => {
   const newPhotoData = { ...props.photoData, [itemId]: url }
   emit('update:photoData', newPhotoData)
