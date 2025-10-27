@@ -1,4 +1,4 @@
--- --- 宿舍檢查系統 - 終極完整 SQL 腳本 (可重複執行 + 修正 get_my_role 錯誤) ---
+-- --- 宿舍檢查系統 - 終極完整 SQL 腳本 (v4 - 修正 get_my_role CASCADE 錯誤) ---
 --
 -- 此腳本包含：
 -- 1. 完整資料表結構 (包含 profiles, user_roles)
@@ -12,6 +12,10 @@
 -- 確保它可以安全地在一個全新的或已部分建立的資料庫上執行。
 --
 -- ----------------------------------------------------------------
+
+-- --- 第 0 部分：預先刪除可能衝突的函數 (使用 CASCADE) ---
+DROP FUNCTION IF EXISTS public.get_my_role() CASCADE; -- 【修正】使用 CASCADE
+-- (其他可能需要預先刪除的函數可以在此處加入)
 
 -- --- 第 1 部分：建立資料表 (安全模式) ---
 --
@@ -191,12 +195,11 @@ ON DELETE SET NULL;
 -- ----------------------------------------------------------------
 
 -- 1. 函數：獲取目前使用者的角色
-DROP FUNCTION IF EXISTS public.get_my_role(); -- 【修正】先刪除舊的
 CREATE OR REPLACE FUNCTION public.get_my_role()
 RETURNS text
 LANGUAGE sql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public -- 重要：確保函數在 public schema 中查找 user_roles
 AS $$
     SELECT role
     FROM public.user_roles
