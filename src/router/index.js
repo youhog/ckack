@@ -1,4 +1,4 @@
-// src/router/index.js
+// youhog/ckack/ckack-10cc0a3bfb263ad24e91487d07fabdff03536175/src/router/index.js
 import { createRouter, createWebHistory } from 'vue-router'
 import { userStore } from '../store/user'
 import { watch } from 'vue'
@@ -14,7 +14,8 @@ import ManageRooms from '../views/admin/ManageRooms.vue'
 import ManageTypes from '../views/admin/ManageTypes.vue' 
 import ManageChecklist from '../views/admin/ManageChecklist.vue' 
 import ManageUsers from '../views/admin/ManageUsers.vue' 
-import KeyReturn from '../views/KeyReturn.vue' // 新增 KeyReturn
+import ManageAllocation from '../views/admin/ManageAllocation.vue' // ADDED: 引入床位分配管理
+import KeyReturn from '../views/KeyReturn.vue' 
 
 // routes 
 const routes = [
@@ -25,7 +26,7 @@ const routes = [
     meta: { requiresAuth: true },
     children: [
       { path: '', name: 'Inspection', component: Inspection, meta: { title: '檢查模式' } },
-      { path: 'key-return', name: 'KeyReturn', component: KeyReturn, meta: { title: '鑰匙歸還' } }, // 新增歸還模式路由
+      { path: 'key-return', name: 'KeyReturn', component: KeyReturn, meta: { title: '鑰匙歸還' } },
       {
         path: 'admin',
         component: Admin,
@@ -37,6 +38,7 @@ const routes = [
           { path: 'rooms', name: 'ManageRooms', component: ManageRooms, meta: { title: '管理房間' } },
           { path: 'types', name: 'ManageTypes', component: ManageTypes, meta: { title: '管理檢查類型' } },
           { path: 'checklist', name: 'ManageChecklist', component: ManageChecklist, meta: { title: '管理檢查項目' } },
+          { path: 'allocation', name: 'ManageAllocation', component: ManageAllocation, meta: { title: '床位匯入' } }, // ADDED
           { path: 'users', name: 'ManageUsers', component: ManageUsers, meta: { title: '帳號管理' } }
         ]
       }
@@ -57,23 +59,18 @@ router.beforeEach(async (to, from, next) => {
 
   const waitForAuth = () => {
     return new Promise((resolve) => {
-      if (!userStore.state.loading) { 
+      // MODIFIED: 等待 isAuthReady 狀態確定，而不是 loading
+      if (userStore.state.isAuthReady) { 
         resolve();
         return;
       }
-      const unwatch = watch(() => userStore.state.loading, (isLoading) => { 
-        if (!isLoading) {
+      const unwatch = watch(() => userStore.state.isAuthReady, (isReady) => { 
+        if (isReady) {
           unwatch(); 
           resolve();
         }
       });
-      setTimeout(() => {
-          if (userStore.state.loading) { 
-              console.warn("路由守衛等待 Auth 超時，強制繼續");
-              unwatch();
-              resolve();
-          }
-      }, 3000); 
+      // REMOVED: 移除超時強制繼續
     });
   };
 

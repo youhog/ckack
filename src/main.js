@@ -1,4 +1,4 @@
-// src/main.js
+// youhog/ckack/ckack-10cc0a3bfb263ad24e91487d07fabdff03536175/src/main.js
 import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
@@ -69,38 +69,39 @@ const setupAuthListener = () => {
 
     const { data } = supabase.auth.onAuthStateChange((event, session) => {
         console.log("Auth 狀態改變:", event, "Session:", session ? "存在" : "不存在");
-        userStore.setSession(session); // Update session state *immediately*
+        
+        // 確保 session 狀態立即更新
+        userStore.setSession(session); 
 
-        // userStore.loading 只追蹤「驗證狀態」是否已確認
-        // 它不應該等待 config 載入
-
+        // 只有在第一次檢查或登入時才需要載入 config/role
         if (event === 'INITIAL_SESSION') {
             console.log("Auth 監聽器: 收到 INITIAL_SESSION 事件。");
             if (session) {
                 // 驗證通過，有使用者
                 console.log("Auth 監聽器: 初始 Session 存在。觸發角色/設定載入...");
-                getRoleAndConfig(); // 觸發背景載入，**不使用 await**
+                getRoleAndConfig(); // 觸發背景載入
             } else {
                 // 驗證通過，無使用者
                 console.log("Auth 監聽器: 初始 Session 為 null (未登入)。");
                 userStore.setRole(null);
             }
-            // 【關鍵修復】: 無論是否有 session，驗證流程已完成
-            userStore.setLoading(false); 
+            // 【關鍵修改】：無論是否有 session，Auth 檢查流程已完成
+            userStore.setLoading(false); // 隱藏 router-guard 的 loading
+            userStore.setAuthReady(true); // MODIFIED: 隱藏 App.vue 的 loading
         }
         else if (event === 'SIGNED_IN') {
              // 使用者剛登入
              console.log("Auth 監聽器: 偵測到登入。觸發角色/設定載入...");
-             // 確保 configStore 是 loading 狀態，以便 App.vue 顯示 "載入系統設定"
-             if (!configStore.state.loading) {
-                configStore.fetchConfig(); // 觸發背景載入
+             
+             // 只有當 config 尚未載入時才需要再次載入
+             if (configStore.state.checklistItems.length === 0 || configStore.state.zones.length === 0) {
+                 getRoleAndConfig(); // 觸發背景載入
              } else {
-                console.log("Config 仍在載入中，不重複觸發");
+                 userStore.setRole(userStore.state.role); // 確保角色有更新
              }
-             // 登入後，驗證狀態也是穩定的
-             if (userStore.state.loading) {
-                userStore.setLoading(false);
-             }
+             
+             userStore.setLoading(false); // 驗證狀態穩定
+             userStore.setAuthReady(true); // MODIFIED: 驗證狀態穩定
         }
         else if (event === 'SIGNED_OUT') {
              // 使用者剛登出
@@ -115,7 +116,6 @@ const setupAuthListener = () => {
                  router.replace({ name: 'Login' });
             }
         }
-        // 其他事件 (如 TOKEN_REFRESHED) 不需要變更 loading 狀態
     });
     authListener = data.subscription; // Store the subscription
     console.log("Auth 監聽器已設定。");
@@ -125,8 +125,8 @@ const setupAuthListener = () => {
 // --- Initialize App ---
 const initializeApp = async () => {
     // 應用程式啟動時，立即將驗證狀態設為 loading
-    // router guard 會等待這個狀態
     userStore.setLoading(true); 
+    userStore.setAuthReady(false); // MODIFIED
     console.log("initializeApp: 開始應用程式初始化流程...");
 
     // 立即設定監聽器
@@ -136,18 +136,10 @@ const initializeApp = async () => {
 
     // 呼叫 getSession() 只是為了觸發監聽器儘快回傳 INITIAL_SESSION
     console.log("initializeApp: 呼叫 getSession() 以觸發 INITIAL_SESSION...");
-    await supabase.auth.getSession();
+    // 這裡不使用 await，讓 onAuthStateChange 非同步處理
+    supabase.auth.getSession();
     
-    // onAuthStateChange 監聽器將會處理後續所有邏輯
-    
-    // 添加一個安全超時
-    setTimeout(() => {
-        if (userStore.state.loading) {
-            console.error("Auth Timeout: 5秒後仍在載入 Auth 狀態。強制解除鎖定。");
-            console.error("請檢查您的 Supabase 連線或 .env 檔案是否正確。");
-            userStore.setLoading(false); // 強制解除鎖定，避免無限卡住
-        }
-    }, 5000); // 5 秒超時
+    // REMOVED: 移除超時強制解除鎖定邏輯
 };
 
 // Initialize the app

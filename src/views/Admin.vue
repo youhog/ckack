@@ -1,3 +1,4 @@
+// youhog/ckack/ckack-10cc0a3bfb263ad24e91487d07fabdff03536175/src/views/Admin.vue
 <template>
   <main id="adminContent" class="space-y-6">
     <AdminStats />
@@ -28,16 +29,17 @@
 
 <script setup>
 import { computed } from 'vue'
-import AdminStats from '@/components/AdminStats.vue' //
+import AdminStats from '@/components/AdminStats.vue' 
 
 // 【新增】導航連結資料
 const adminLinks = [
-  { name: 'AdminDashboard', icon: '📊', text: '儀表板' }, //
-  { name: 'ManageZones', icon: '🏢', text: '管理區域' }, //
-  { name: 'ManageRooms', icon: '🚪', text: '管理房間' }, //
-  { name: 'ManageTypes', icon: '📝', text: '管理類型' }, //
-  { name: 'ManageChecklist', icon: '📋', text: '管理檢查項目' }, //
-  { name: 'ManageUsers', icon: '👥', text: '管理使用者' } //
+  { name: 'AdminDashboard', icon: '📊', text: '儀表板' },
+  { name: 'ManageZones', icon: '🏢', text: '管理區域' },
+  { name: 'ManageRooms', icon: '🚪', text: '管理房間' },
+  { name: 'ManageTypes', icon: '📝', text: '管理類型' },
+  { name: 'ManageChecklist', icon: '📋', text: '管理檢查項目' },
+  { name: 'ManageAllocation', icon: '🛏️', text: '床位匯入' }, // ADDED
+  { name: 'ManageUsers', icon: '👥', text: '管理使用者' } 
 ];
 
 // Supabase 儀表板連結 (保持不變)
@@ -54,7 +56,7 @@ const projectRef = computed(() => {
 });
 const supabaseDashboardUrl = computed(() => {
     if (projectRef.value) {
-        return `https://supabase.com/dashboard/project/${projectRef.value}/editor/table/user_roles?schema=public`; //
+        return `https://supabase.com/dashboard/project/${projectRef.value}/editor/table/user_roles?schema=public`; 
     }
     return 'https://supabase.com/dashboard';
 });

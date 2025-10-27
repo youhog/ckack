@@ -1,10 +1,12 @@
+// youhog/ckack/ckack-10cc0a3bfb263ad24e91487d07fabdff03536175/src/views/admin/ManageUsers.vue
 <template>
   <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6">
     <h3 class="text-xl font-semibold text-slate-800 dark:text-slate-100 mb-2">管理使用者</h3>
-    <p class="text-sm text-slate-500 dark:text-slate-400 mb-6">檢視系統中的所有使用者並管理他們的角色。</p>
+    <p class="text-sm text-slate-500 dark:text-slate-400 mb-6">檢視系統中的所有使用者並管理他們的角色。只有 `admin` 才能更改角色。</p>
 
     <div class="mb-6 p-4 bg-yellow-50 dark:bg-yellow-500/10 border-l-4 border-yellow-400 dark:border-yellow-600 text-yellow-800 dark:text-yellow-200 text-sm">
-      <p><strong>注意：</strong>基於安全考量，刪除使用者功能應透過安全的後端 (例如 Supabase Edge Function) 或直接在 Supabase 儀表板操作。前端直接刪除使用者 (特別是使用 admin 權限) 存在安全風險。</p>
+      <p><strong>注意：</strong>基於安全考量，刪除使用者功能應透過安全的後端 (例如 Supabase Edge Function) 或直接在 Supabase 儀表板操作。</p>
+      <p class="mt-1">您**無法**透過前端修改自己的角色。</p>
     </div>
 
     <div v-if="loading" class="text-center text-slate-500 dark:text-slate-400 py-8">載入使用者列表中...</div>
@@ -24,32 +26,39 @@
         </thead>
         <tbody class="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
           <tr v-for="user in users" :key="user.id" class="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 dark:text-slate-100">{{ user.email }}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">{{ new Date(user.created_at).toLocaleDateString('zh-TW') }}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm">
+            <td data-label="Email" class="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 dark:text-slate-100">{{ user.email }}</td>
+            <td data-label="註冊時間" class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">{{ new Date(user.created_at).toLocaleDateString('zh-TW') }}</td>
+            <td data-label="角色" class="px-6 py-4 whitespace-nowrap text-sm">
               <select 
-                v-model="user.role" 
-                @change="confirmRoleChange(user)" 
+                v-model="user.newRole" 
+                @change="user.isDirty = true"
                 class="form-control py-1 px-3 w-auto"
-                :disabled="user.id === currentUserId || isSaving[user.id]"
-                :class="{ 'opacity-50 cursor-not-allowed': user.id === currentUserId }"
+                :disabled="!canEditRole(user) || isSaving[user.id]"
+                :class="{ 'opacity-50 cursor-not-allowed': !canEditRole(user) }"
                 title="更改角色"
               >
-                <option value="inspector">Inspector</option>
-                <option value="admin">Admin</option>
+                <option 
+                    v-for="role in availableRoles"
+                    :key="role" 
+                    :value="role"
+                >
+                    {{ role }}
+                </option>
               </select>
+              <span v-if="!canEditRole(user) && user.id === currentUserId" class="text-xs text-slate-400 italic ml-2">(自己)</span>
+              <span v-else-if="!canEditRole(user) && user.currentRole === 'superadmin'" class="text-xs text-slate-400 italic ml-2">(Superadmin)</span>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+            <td data-label="操作" class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                <button 
-                @click="updateRole(user.id, user.role, users.find(u => u.id === user.id)?.role)" 
+                @click="updateRole(user)" 
                 class="btn-primary btn-sm" 
-                v-if="!isSaving[user.id]"
-                :disabled="user.id === currentUserId"
+                v-if="user.isDirty && !isSaving[user.id]"
+                :disabled="!canEditRole(user)"
                >
                  保存
                </button>
                <span v-if="isSaving[user.id]" class="text-xs text-slate-500 italic">保存中...</span>
-               <span v-if="user.id === currentUserId" class="text-xs text-slate-400 italic ml-2">(自己)</span>
+               <span v-else-if="!user.isDirty" class="text-xs text-slate-400 italic">已保存</span>
             </td>
           </tr>
         </tbody>
@@ -59,25 +68,39 @@
 </template>
 
 <script setup>
-import { ref, onMounted, reactive } from 'vue'
-import { supabase } from '@/services/supabase' //
-import { userStore } from '@/store/user' //
-import { showToast } from '@/utils' //
+import { ref, onMounted, reactive, computed } from 'vue'
+import { supabase } from '@/services/supabase' 
+import { userStore } from '@/store/user' 
+import { configStore } from '@/store/config' 
+import { showToast } from '@/utils' 
 
-// --- (所有 <script> 邏輯保持不變) ---
 const loading = ref(true)
 const error = ref(null)
 const users = ref([]) 
 const isSaving = reactive({}) 
-const currentUserId = userStore.state.user?.id; //
+const currentUserId = userStore.state.user?.id; 
+const config = configStore.state; 
+
+const availableRoles = computed(() => { 
+    // MODIFIED: 確保 roles 被載入後才能使用
+    return config.roles.length > 0 
+        ? config.roles.map(r => r.name).sort() 
+        : ['admin', 'inspector']; // Fallback
+});
 
 const fetchUsers = async () => {
     loading.value = true;
     error.value = null;
+    
+    // MODIFIED: 確保角色列表已載入
+    if (config.roles.length === 0) {
+        await fetchAllRoles(); 
+    }
+
     console.log("ManageUsers: Fetching users (from profiles)...");
 
-    const { data, error: fetchError } = await supabase //
-        .from('profiles') //
+    const { data, error: fetchError } = await supabase
+        .from('profiles')
         .select(`
             id,
             email,
@@ -93,79 +116,103 @@ const fetchUsers = async () => {
              error.value = `載入使用者列表失敗: ${fetchError.message}`;
          }
         console.error("Fetch users error:", fetchError);
-        showToast(error.value, 'error'); //
+        showToast(error.value, 'error'); 
     } else {
         users.value = data.map(u => ({
             id: u.id,
             email: u.email || 'N/A',
             created_at: u.created_at,
-            role: u.user_roles && u.user_roles.length > 0 ? u.user_roles[0].role : 'inspector'
+            currentRole: u.user_roles && u.user_roles.length > 0 ? u.user_roles[0].role : 'inspector',
+            newRole: u.user_roles && u.user_roles.length > 0 ? u.user_roles[0].role : 'inspector',
+            isDirty: false,
         }));
          console.log(`Fetched ${users.value.length} users.`);
     }
     loading.value = false;
 };
 
-onMounted(fetchUsers);
-
-const confirmRoleChange = async (user) => {
-    const userInArray = users.value.find(u => u.id === user.id);
-    if (!userInArray) return;
-
-    let originalRole = userInArray.role;
-    const newRole = user.role; 
-
-    if (newRole === originalRole) {
-        console.log("角色未改變");
-        return;
-    }
-
-    if (confirm(`確定要將使用者 ${user.email} 的角色從 "${originalRole}" 更改為 "${newRole}" 嗎？`)) {
-        await updateRole(user.id, newRole, originalRole);
-    } else {
-        console.log("使用者取消更改");
-        user.role = originalRole; 
-        userInArray.role = originalRole; 
+// ADDED: 輔助函式，從 DB 載入所有角色 (因為 configStore 預設只載入 Checklist 和 Zones)
+const fetchAllRoles = async () => {
+    try {
+        const { data, error } = await supabase.from('user_roles').select('role');
+        if (error) throw error;
+        // 提取所有不重複的角色名稱
+        const uniqueRoles = [...new Set(data.map(r => r.role))].map(role => ({ name: role }));
+        config.roles = uniqueRoles; 
+    } catch (e) {
+        console.error("Failed to load roles for select box:", e);
     }
 };
 
-const updateRole = async (userId, newRole, originalRole) => {
-    if (userId === currentUserId) {
-        showToast('無法更改自己的角色。', 'error'); //
-        const user = users.value.find(u => u.id === userId);
-        if (user) user.role = originalRole;
+onMounted(() => {
+    // 確保 config.roles 在 mounted 時被載入，即使 configStore 沒有預載入
+    if (config.roles.length === 0) {
+        fetchAllRoles(); 
+    }
+    fetchUsers();
+});
+
+
+const canEditRole = (user) => {
+    // 檢查當前登入者是否為 'admin'
+    if (userStore.state.role !== 'admin') {
+        return false;
+    }
+    
+    // admin 不能修改自己
+    if (user.id === currentUserId) {
+        return false;
+    }
+    
+    // admin 不能修改 superadmin (如果您的 DB 有 superadmin 角色)
+    if (user.currentRole === 'superadmin') {
+        return false;
+    }
+
+    return true;
+};
+
+const updateRole = async (user) => {
+    if (!canEditRole(user) || !user.isDirty) {
         return;
     }
 
-    isSaving[userId] = true;
-    error.value = null;
+    const originalRole = user.currentRole;
 
-    console.log(`Calling RPC update_user_role for user ${userId} to role ${newRole}`);
+    if (confirm(`確定要將使用者 ${user.email} 的角色從 "${user.currentRole}" 更改為 "${user.newRole}" 嗎？`)) {
+        isSaving[user.id] = true;
+        error.value = null;
 
-    const { error: rpcError } = await supabase.rpc('update_user_role', { //
-        target_user_id: userId,
-        new_role: newRole
-    });
+        console.log(`Calling RPC update_user_role for user ${user.id} to role ${user.newRole}`);
 
-    if (rpcError) {
-        error.value = `更新角色失敗: ${rpcError.message}`;
-        console.error("Update role RPC error:", rpcError);
-        showToast(error.value, 'error'); //
-        const user = users.value.find(u => u.id === userId);
-        if (user) user.role = originalRole;
+        const { error: rpcError } = await supabase.rpc('update_user_role', { 
+            target_user_id: user.id,
+            new_role: user.newRole
+        });
 
+        if (rpcError) {
+            error.value = `更新角色失敗: ${rpcError.message}`;
+            console.error("Update role RPC error:", rpcError);
+            showToast(error.value, 'error'); 
+            
+            // 恢復原始狀態
+            user.newRole = originalRole;
+            user.isDirty = false;
+
+        } else {
+            showToast(`使用者 ${user.email} 的角色已更新為 ${user.newRole}`, 'success'); 
+            
+            // 更新原始狀態和 dirty 標誌
+            user.currentRole = user.newRole;
+            user.isDirty = false;
+        }
+        isSaving[user.id] = false;
     } else {
-        showToast(`使用者 ${users.value.find(u=>u.id===userId)?.email || userId} 的角色已更新為 ${newRole}`, 'success'); //
-        const userInArray = users.value.find(u => u.id === userId);
-        if (userInArray) userInArray.role = newRole;
+        // 使用者取消，恢復 newRole 狀態
+        user.newRole = originalRole;
+        user.isDirty = false;
     }
-    isSaving[userId] = false;
 };
-
-const showDeleteWarning = () => {
-    alert('基於安全考量，刪除使用者功能應透過安全的後端 (例如 Supabase Edge Function) 或直接在 Supabase 儀表板操作。\n\n前端直接刪除使用者 (特別是使用 admin 權限) 存在安全風險。');
-}
-
 </script>
 
 <style scoped>

@@ -1,20 +1,17 @@
--- --- 宿舍檢查系統 - 終極完整 SQL 腳本 (v4 - 修正 get_my_role CASCADE 錯誤) ---
+-- --- 宿舍檢查系統 - 終極完整 SQL 腳本 (v7 - 新增床位分配表) ---
 --
 -- 此腳本包含：
--- 1. 完整資料表結構 (包含 profiles, user_roles)
+-- 1. 完整資料表結構 (包含 profiles, user_roles, student_allocations)
 -- 2. 完整外鍵 (Foreign Key) 關聯
 -- 3. 自動化函數 (Functions) 與觸發器 (Triggers)
 -- 4. 儲存體 (Storage) 設定
 -- 5. 完整 RLS (資料列層級安全性) 策略
 -- 6. 範例資料 (用於測試)
 --
--- 使用 "IF NOT EXISTS" 和 "DROP IF EXISTS" 語法，
--- 確保它可以安全地在一個全新的或已部分建立的資料庫上執行。
---
 -- ----------------------------------------------------------------
 
 -- --- 第 0 部分：預先刪除可能衝突的函數 (使用 CASCADE) ---
-DROP FUNCTION IF EXISTS public.get_my_role() CASCADE; -- 【修正】使用 CASCADE
+DROP FUNCTION IF EXISTS public.get_my_role() CASCADE;
 -- (其他可能需要預先刪除的函數可以在此處加入)
 
 -- --- 第 1 部分：建立資料表 (安全模式) ---
@@ -120,6 +117,35 @@ CREATE TABLE IF NOT EXISTS public.reports (
 );
 COMMENT ON TABLE public.reports IS '儲存所有提交的檢查報告';
 
+-- 9. 鑰匙歸還記錄
+CREATE TABLE IF NOT EXISTS public.key_returns (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    user_id uuid, -- 紀錄處理歸還的人
+    zone_id uuid NOT NULL,
+    room_id uuid NOT NULL,
+    student_id text, -- 學生學號/ID
+    bed_number text, -- 床位號碼 (例如: '1', 'A')
+    return_notes text,
+    is_returned boolean DEFAULT true NOT NULL,
+    CONSTRAINT key_returns_pkey PRIMARY KEY (id)
+);
+COMMENT ON TABLE public.key_returns IS '儲存房間鑰匙歸還紀錄，並與特定床位/學生連結。';
+
+-- 10. 學生床位分配 (NEW TABLE)
+CREATE TABLE IF NOT EXISTS public.student_allocations (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    student_id text NOT NULL, -- 學號 (唯一識別碼)
+    zone_id uuid NOT NULL,
+    room_id uuid NOT NULL,
+    bed_number text NOT NULL, -- 實際床位號 (1, 2, 3, 4)
+    CONSTRAINT student_allocations_pkey PRIMARY KEY (id),
+    CONSTRAINT student_allocations_student_id_key UNIQUE (student_id),
+    CONSTRAINT student_allocations_room_bed_key UNIQUE (room_id, bed_number)
+);
+COMMENT ON TABLE public.student_allocations IS '學生床位分配表，用於學號查詢。';
+
 
 -- --- 第 2 部分：建立外鍵 (Foreign Key) 關聯 (安全模式) ---
 --
@@ -157,7 +183,7 @@ FOREIGN KEY (category_id)
 REFERENCES public.checklist_categories (id)
 ON DELETE CASCADE;
 
--- 5. `reports` -> `profiles` (修復 400 錯誤的關鍵)
+-- 5. `reports` -> `profiles`
 ALTER TABLE public.reports DROP CONSTRAINT IF EXISTS reports_user_id_fkey;
 ALTER TABLE public.reports
 ADD CONSTRAINT reports_user_id_fkey
@@ -189,6 +215,46 @@ FOREIGN KEY (check_type_id)
 REFERENCES public.check_types (id)
 ON DELETE SET NULL;
 
+-- 9. `key_returns` -> `profiles`
+ALTER TABLE public.key_returns DROP CONSTRAINT IF EXISTS key_returns_user_id_fkey;
+ALTER TABLE public.key_returns
+ADD CONSTRAINT key_returns_user_id_fkey
+FOREIGN KEY (user_id)
+REFERENCES public.profiles (id)
+ON DELETE SET NULL;
+
+-- 10. `key_returns` -> `dorm_zones`
+ALTER TABLE public.key_returns DROP CONSTRAINT IF EXISTS key_returns_zone_id_fkey;
+ALTER TABLE public.key_returns
+ADD CONSTRAINT key_returns_zone_id_fkey
+FOREIGN KEY (zone_id)
+REFERENCES public.dorm_zones (id)
+ON DELETE RESTRICT;
+
+-- 11. `key_returns` -> `rooms`
+ALTER TABLE public.key_returns DROP CONSTRAINT IF EXISTS key_returns_room_id_fkey;
+ALTER TABLE public.key_returns
+ADD CONSTRAINT key_returns_room_id_fkey
+FOREIGN KEY (room_id)
+REFERENCES public.rooms (id)
+ON DELETE RESTRICT;
+
+-- 12. `student_allocations` -> `rooms`
+ALTER TABLE public.student_allocations DROP CONSTRAINT IF EXISTS student_allocations_room_id_fkey;
+ALTER TABLE public.student_allocations
+ADD CONSTRAINT student_allocations_room_id_fkey
+FOREIGN KEY (room_id)
+REFERENCES public.rooms (id)
+ON DELETE CASCADE;
+
+-- 13. `student_allocations` -> `dorm_zones`
+ALTER TABLE public.student_allocations DROP CONSTRAINT IF EXISTS student_allocations_zone_id_fkey;
+ALTER TABLE public.student_allocations
+ADD CONSTRAINT student_allocations_zone_id_fkey
+FOREIGN KEY (zone_id)
+REFERENCES public.dorm_zones (id)
+ON DELETE CASCADE;
+
 
 -- --- 第 3 部分：資料庫函數 (RPC) 與觸發器 (Triggers) ---
 --
@@ -199,14 +265,14 @@ CREATE OR REPLACE FUNCTION public.get_my_role()
 RETURNS text
 LANGUAGE sql
 SECURITY DEFINER
-SET search_path = public -- 重要：確保函數在 public schema 中查找 user_roles
+SET search_path = public
 AS $$
     SELECT role
     FROM public.user_roles
     WHERE user_id = auth.uid();
 $$;
 
--- 2. 函數：處理新使用者註冊 (for Login.vue)
+-- 2. 函數：處理新使用者註冊 (為 profiles 和 user_roles 設定紀錄)
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -217,12 +283,12 @@ BEGIN
     -- 1. 在 profiles 建立紀錄
     INSERT INTO public.profiles (id, email)
     VALUES (NEW.id, NEW.email)
-    ON CONFLICT (id) DO NOTHING; -- 如果已存在則跳過
+    ON CONFLICT (id) DO NOTHING;
 
     -- 2. 在 user_roles 建立紀錄，預設為 'inspector'
     INSERT INTO public.user_roles (user_id, role)
     VALUES (NEW.id, 'inspector')
-    ON CONFLICT (user_id) DO NOTHING; -- 如果已存在則跳過
+    ON CONFLICT (user_id) DO NOTHING;
 
     RETURN NEW;
 END;
@@ -249,7 +315,7 @@ BEGIN
         RAISE EXCEPTION '權限不足：只有 admin 可以更改使用者角色';
     END IF;
 
-    -- 檢查是否試圖更改自己的角色
+    -- 檢查是否試圖更改自己的角色 (雖然前端已擋，後端再擋一次更安全)
     IF target_user_id = auth.uid() THEN
         RAISE EXCEPTION '無法更改自己的角色';
     END IF;
@@ -347,8 +413,24 @@ CREATE POLICY "Allow admins to delete all reports" ON public.reports FOR DELETE 
 CREATE POLICY "Allow inspectors to read their own reports" ON public.reports FOR SELECT TO authenticated USING ( user_id = auth.uid() );
 CREATE POLICY "Allow inspectors to delete their own reports" ON public.reports FOR DELETE TO authenticated USING ( user_id = auth.uid() );
 
+-- 5i. key_returns
+ALTER TABLE public.key_returns ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow authenticated users to insert key_returns" ON public.key_returns;
+DROP POLICY IF EXISTS "Allow admins to read all key_returns" ON public.key_returns;
+DROP POLICY IF EXISTS "Allow inspectors to read their own key_returns" ON public.key_returns;
 
--- ----------------------------------------------------------------
+CREATE POLICY "Allow authenticated users to insert key_returns" ON public.key_returns FOR INSERT TO authenticated WITH CHECK ( user_id = auth.uid() );
+CREATE POLICY "Allow admins to read all key_returns" ON public.key_returns FOR SELECT TO authenticated USING ( public.get_my_role() = 'admin' );
+CREATE POLICY "Allow inspectors to read their own key_returns" ON public.key_returns FOR SELECT TO authenticated USING ( user_id = auth.uid() );
+
+-- 5j. student_allocations (NEW RLS)
+ALTER TABLE public.student_allocations ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all authenticated users to read student allocations" ON public.student_allocations;
+CREATE POLICY "Allow all authenticated users to read student allocations" ON public.student_allocations FOR SELECT TO authenticated USING ( true );
+DROP POLICY IF EXISTS "Allow admins to manage student allocations" ON public.student_allocations;
+CREATE POLICY "Allow admins to manage student allocations" ON public.student_allocations FOR ALL TO authenticated USING ( public.get_my_role() = 'admin' ) WITH CHECK ( public.get_my_role() = 'admin' );
+
+
 -- --- 第 6 部分：範例資料 (Sample Data) ---
 --
 -- ----------------------------------------------------------------
@@ -370,6 +452,21 @@ INSERT INTO public.rooms (zone_id, room_number)
 SELECT id, room_list.room_number
 FROM public.dorm_zones, (VALUES ('101'), ('102'), ('201'), ('202')) AS room_list(room_number)
 ON CONFLICT (zone_id, room_number) DO NOTHING;
+
+-- 範例床位分配 (用於測試 KeyReturn.vue 的查找功能)
+INSERT INTO public.student_allocations (student_id, zone_id, room_id, bed_number)
+SELECT 
+    'A111001', 
+    dz.id, 
+    r.id, 
+    '1'
+FROM 
+    public.dorm_zones dz, 
+    public.rooms r
+WHERE 
+    dz.name = 'A 區 (男生宿舍)' AND r.room_number = '101' AND r.zone_id = dz.id
+ON CONFLICT (student_id) DO NOTHING;
+
 
 INSERT INTO public.checklist_categories (name, icon, display_order)
 VALUES

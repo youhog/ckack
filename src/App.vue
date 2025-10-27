@@ -1,15 +1,26 @@
+// youhog/ckack/ckack-10cc0a3bfb263ad24e91487d07fabdff03536175/src/App.vue
 <template>
-  <div v-if="userStore.state.loading || (userStore.state.session && configStore.state.loading)" class="loading-screen">
+  <div v-if="!userStore.state.isAuthReady" class="loading-screen">
     <div class="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl text-center">
       <h2 class="text-2xl font-semibold text-slate-800 dark:text-slate-100">
         宿舍檢查系統載入中...
       </h2>
       <p class="text-slate-500 dark:text-slate-400 mt-2">
-        <span v-if="userStore.state.loading">正在驗證使用者...</span>
-        <span v-else-if="configStore.state.loading">正在載入系統設定...</span>
+        <span>正在驗證使用者...</span>
       </p>
       <div class="spinner mt-6"></div>
     </div>
+  </div>
+  <div v-else-if="userStore.state.session && configStore.state.loading" class="loading-screen">
+      <div class="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl text-center">
+          <h2 class="text-2xl font-semibold text-slate-800 dark:text-slate-100">
+            宿舍檢查系統載入中...
+          </h2>
+          <p class="text-slate-500 dark:text-slate-400 mt-2">
+            <span>正在載入系統設定...</span>
+          </p>
+          <div class="spinner mt-6"></div>
+      </div>
   </div>
   <router-view v-else />
 </template>
