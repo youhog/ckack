@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 您可以在這裡加入一些全域基礎樣式，
+   例如 body 背景色，但建議盡量使用 Tailwind classes */
+body {
+  @apply bg-gray-100; /* 範例：設定淺灰色背景 */
+}

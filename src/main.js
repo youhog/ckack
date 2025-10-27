@@ -7,7 +7,7 @@ import { userStore } from './store/user'
 import { configStore } from './store/config'
 
 // Import your global CSS
-import './assets/style.css'
+import './index.css' // 匯入 Tailwind 的進入點
 
 console.log("應用程式初始化開始...");
 
