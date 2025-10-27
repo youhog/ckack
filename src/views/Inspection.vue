@@ -140,16 +140,16 @@
         </div>
     </div>
     
-    <ConfirmModal // ADDED: 引入自定義 ConfirmModal 元件
-      v-model="showMarkAllGoodConfirm" // ADDED: 綁定顯示狀態
-      title="確認標記全部良好" // ADDED
-      :message="markAllGoodConfirmMessage" // ADDED: 綁定計算屬性
-      confirm-text="確定標記" // ADDED
-      confirm-variant="primary" // ADDED
-      @confirm="executeMarkAllGood" // ADDED: 綁定確認執行的函式
-      @cancel="showMarkAllGoodConfirm = false" // ADDED: 綁定取消關閉狀態
-    /> // END ADDED
-  </main>
+        <ConfirmModal
+            v-model="showMarkAllGoodConfirm"
+            title="確認標記全部良好"
+            :message="markAllGoodConfirmMessage"
+            confirm-text="確定標記"
+            confirm-variant="primary"
+            @confirm="executeMarkAllGood"
+            @cancel="showMarkAllGoodConfirm = false"
+            />
+    </main>
 </template>
 
 <script setup>
