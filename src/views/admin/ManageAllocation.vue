@@ -1,3 +1,4 @@
+// youhog/ckack/ckack-10cc0a3bfb263ad24e91487d07fabdff03536175/src/views/admin/ManageAllocation.vue
 <template>
   <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6">
     <h3 class="text-xl font-semibold text-slate-800 dark:text-slate-100 mb-2">管理學生床位分配</h3>
@@ -61,7 +62,7 @@ import { ref, onMounted } from 'vue'
 import { supabase } from '@/services/supabase'
 import { configStore } from '@/store/config'
 import { showToast } from '@/utils'
-import Papa from 'papaparse'; // 確保已安裝: npm install papaparse
+import Papa from 'papaparse'; 
 
 const config = configStore.state
 const isSaving = ref(false);
@@ -72,13 +73,10 @@ const importResults = ref({
   failedCount: 0,
   errors: [],
 });
-const roomsMap = ref(new Map()); // Map to store room_number -> room_id and room_number -> zone_id
+const roomsMap = ref(new Map()); 
 
 onMounted(async () => {
-    // REMOVED: 冗餘檢查。main.js 已經保證 config 在此處是載入完成的。
-    // if (config.zones.length === 0 || config.checklistCategories.length === 0) {
-    //     await configStore.fetchConfig(); 
-    // }
+    // REMOVED: 冗餘檢查 (configStore.fetchConfig())
     await fetchAllRooms();
 });
 

@@ -81,72 +81,82 @@ const isSaving = reactive({})
 const currentUserId = userStore.state.user?.id; 
 const config = configStore.state; 
 
+const localAvailableRoles = ref([]); // MODIFIED: Local state for roles list
+
 const availableRoles = computed(() => { 
-    // MODIFIED: 確保 roles 被載入後才能使用
-    return config.roles.length > 0 
-        ? config.roles.map(r => r.name).sort() 
-        : ['admin', 'inspector']; // Fallback
+    return localAvailableRoles.value.map(r => r.name).sort(); 
 });
 
 const fetchUsers = async () => {
     loading.value = true;
     error.value = null;
     
-    // MODIFIED: 確保角色列表已載入
-    if (config.roles.length === 0) {
-        await fetchAllRoles(); 
-    }
+    // MODIFIED START: 使用兩次查詢取代複雜的 PostgREST 關聯查詢
+    try {
+        // 1. Fetch User Profiles (with created_at from auth.users)
+        const { data: profilesData, error: profilesError } = await supabase
+            .from('profiles')
+            .select(`id, email, created_at`)
+            .order('email', { ascending: true }); 
 
-    console.log("ManageUsers: Fetching users (from profiles)...");
+        if (profilesError) throw profilesError;
+        
+        // 2. Fetch all User Roles
+        const { data: rolesData, error: rolesError } = await supabase
+            .from('user_roles')
+            .select(`user_id, role`);
 
-    const { data, error: fetchError } = await supabase
-        .from('profiles')
-        .select(`
-            id,
-            email,
-            created_at,
-            user_roles ( role ) 
-        `) 
-        .order('created_at', { ascending: false }); 
+        if (rolesError) throw rolesError;
+        
+        // 3. Merge data
+        const rolesMap = new Map((rolesData || []).map(r => [r.user_id, r.role]));
+        
+        const mergedUsers = (profilesData || []).map(p => {
+            const determinedRole = rolesMap.get(p.id) || 'inspector';
+            
+            return {
+                id: p.id,
+                email: p.email || 'N/A',
+                created_at: p.created_at,
+                currentRole: determinedRole,
+                newRole: determinedRole,
+                isDirty: false,
+            };
+        });
 
-    if (fetchError) {
-         if (fetchError.code === 'PGRST200') {
-             error.value = `載入使用者列表失敗: 無法關聯 user_roles 表格。請檢查資料庫外鍵 user_roles.user_id -> auth.users.id 是否存在。(${fetchError.message})`;
-         } else {
-             error.value = `載入使用者列表失敗: ${fetchError.message}`;
-         }
-        console.error("Fetch users error:", fetchError);
-        showToast(error.value, 'error'); 
-    } else {
-        users.value = data.map(u => ({
-            id: u.id,
-            email: u.email || 'N/A',
-            created_at: u.created_at,
-            currentRole: u.user_roles && u.user_roles.length > 0 ? u.user_roles[0].role : 'inspector',
-            newRole: u.user_roles && u.user_roles.length > 0 ? u.user_roles[0].role : 'inspector',
-            isDirty: false,
-        }));
+        users.value = mergedUsers;
          console.log(`Fetched ${users.value.length} users.`);
+    } catch (fetchError) {
+        // 捕捉任何錯誤，包括 profilesError 和 rolesError
+        error.value = `載入使用者列表失敗: ${fetchError.message}`;
+        console.error("Fetch users error:", fetchError);
+        showToast(error.value, 'error');
     }
+    // MODIFIED END
+
     loading.value = false;
 };
 
-// ADDED: 輔助函式，從 DB 載入所有角色 (因為 configStore 預設只載入 Checklist 和 Zones)
+// ADDED: 輔助函式，從 DB 載入所有角色
 const fetchAllRoles = async () => {
     try {
         const { data, error } = await supabase.from('user_roles').select('role');
         if (error) throw error;
+        
+        const rolesData = Array.isArray(data) ? data : []; 
         // 提取所有不重複的角色名稱
-        const uniqueRoles = [...new Set(data.map(r => r.role))].map(role => ({ name: role }));
-        config.roles = uniqueRoles; 
+        const uniqueRoles = [...new Set(rolesData.map(r => r.role))].map(role => ({ name: role }));
+        
+        localAvailableRoles.value = uniqueRoles; // MODIFIED: 寫入到本地狀態
+        
     } catch (e) {
         console.error("Failed to load roles for select box:", e);
     }
 };
 
 onMounted(() => {
-    // 確保 config.roles 在 mounted 時被載入，即使 configStore 沒有預載入
-    if (config.roles.length === 0) {
+    // 確保 localAvailableRoles 在 mounted 時被載入
+    if (localAvailableRoles.value.length === 0) {
         fetchAllRoles(); 
     }
     fetchUsers();
