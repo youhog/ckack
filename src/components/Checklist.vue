@@ -1,10 +1,10 @@
 <template>
-  <div class="card p-6 fade-in">
-    <div class="flex items-center gap-3 mb-4">
-        <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl flex items-center justify-center text-white text-lg">
+  <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 animate-fade-in">
+    <div class="flex items-center gap-3 mb-6">
+        <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl flex items-center justify-center text-white text-lg shadow">
             {{ category.icon }}
         </div>
-        <h3 class="text-xl font-semibold text-gray-800">{{ category.name }}</h3>
+        <h3 class="text-xl font-semibold text-slate-800 dark:text-slate-100">{{ category.name }}</h3>
     </div>
 
     <div class="space-y-4">
@@ -25,11 +25,12 @@
 </template>
 
 <script setup>
-import ChecklistItem from './ChecklistItem.vue'
+import ChecklistItem from './ChecklistItem.vue' //
 
+// --- (所有 <script> 邏輯保持不變) ---
 const props = defineProps({
   category: Object,
-  items: Array, // 傳入該分類的項目
+  items: Array,
   checkData: Object,
   notesData: Object,
   photoData: Object
@@ -37,7 +38,6 @@ const props = defineProps({
 
 const emit = defineEmits(['update:checkData', 'update:notesData', 'update:photoData'])
 
-// 這裡的邏輯不變，因為 itemId 已經是 item.id
 const updateStatus = ({ itemId, status }) => {
   const newCheckData = { ...props.checkData, [itemId]: status }
   emit('update:checkData', newCheckData)
@@ -53,3 +53,13 @@ const updatePhoto = ({ itemId, url }) => {
   emit('update:photoData', newPhotoData)
 }
 </script>
+
+<style scoped>
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+</style>

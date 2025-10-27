@@ -1,12 +1,20 @@
 <template>
-  <div class="card p-6">
+  <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6">
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <h3 class="text-xl font-semibold text-gray-800">📊 檢查報告管理 (所有使用者)</h3>
+        <h3 class="text-xl font-semibold text-slate-800 dark:text-slate-100">📊 檢查報告管理 (所有使用者)</h3>
         <div class="flex gap-2 w-full sm:w-auto">
-             <button @click="exportAllReports" class="btn btn-primary w-1/2 sm:w-auto" :disabled="reports.length === 0">
+             <button 
+                @click="exportAllReports" 
+                class="inline-flex items-center justify-center px-4 py-2 rounded-xl font-medium transition-all duration-200 cursor-pointer w-1/2 sm:w-auto bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed"
+                :disabled="reports.length === 0"
+             >
                 📤 匯出 (目前頁面)
             </button>
-            <button @click="clearFilteredReports" class="btn w-1/2 sm:w-auto" :disabled="reports.length === 0" style="background: rgba(239, 68, 68, 0.1); color: #ef4444;">
+            <button 
+              @click="clearFilteredReports" 
+              class="inline-flex items-center justify-center px-4 py-2 rounded-xl font-medium transition-all duration-200 cursor-pointer w-1/2 sm:w-auto bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-500/30 disabled:opacity-60 disabled:cursor-not-allowed"
+              :disabled="reports.length === 0"
+            >
                 🗑️ 刪除 (篩選後)
             </button>
         </div>
@@ -32,7 +40,7 @@
         <input type="text" placeholder="檢查人員 Email 或姓名" class="form-control" v-model="filters.inspector" @input="applyFiltersDebounced">
     </div>
 
-    <div v-if="loading" class="text-center text-gray-500 py-8">載入報告中...</div>
+    <div v-if="loading" class="text-center text-slate-500 py-8">載入報告中...</div>
     <div v-else-if="error" class="text-center text-red-500 py-8">{{ error }}</div>
     <ReportList
       v-else
@@ -42,29 +50,37 @@
     />
 
     <div class="flex justify-between items-center mt-6">
-        <span class="text-sm text-gray-600">
+        <span class="text-sm text-slate-600 dark:text-slate-400">
             總共 {{ totalReports }} 筆報告 (第 {{ currentPage }} / {{ totalPages }} 頁)
         </span>
         <div class="flex gap-2">
-            <button @click="prevPage" class="btn btn-secondary" :disabled="currentPage === 1">
+            <button 
+              @click="prevPage" 
+              class="inline-flex items-center justify-center px-4 py-2 rounded-xl font-medium transition-all duration-200 cursor-pointer bg-white dark:bg-slate-700 border border-slate-900/10 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600 disabled:opacity-60 disabled:cursor-not-allowed"
+              :disabled="currentPage === 1"
+            >
                 上一頁
             </button>
-            <button @click="nextPage" class="btn btn-secondary" :disabled="currentPage === totalPages || totalPages === 0">
+            <button 
+              @click="nextPage" 
+              class="inline-flex items-center justify-center px-4 py-2 rounded-xl font-medium transition-all duration-200 cursor-pointer bg-white dark:bg-slate-700 border border-slate-900/10 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600 disabled:opacity-60 disabled:cursor-not-allowed"
+              :disabled="currentPage === totalPages || totalPages === 0"
+            >
                 下一頁
             </button>
         </div>
     </div>
 
 
-    <dialog ref="reportDialog" class="card p-0 max-w-4xl w-full">
-       <div class="dialog-header flex justify-between items-center sticky top-0">
+    <dialog ref="reportDialog" class="p-0 max-w-4xl w-full">
+       <div class="sticky top-0 bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 p-6 flex justify-between items-center z-10">
           <div class="flex items-center gap-3">
               <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl flex items-center justify-center text-white text-xl">
                   📋
               </div>
-              <h3 class="text-2xl font-bold text-gray-800">檢查報告詳情</h3>
+              <h3 class="text-2xl font-bold text-slate-800 dark:text-slate-100">檢查報告詳情</h3>
           </div>
-          <button @click="closeReportDialog" class="close-modal-btn w-10 h-10 bg-gray-100 hover:bg-gray-200 rounded-xl flex items-center justify-center text-gray-500 hover:text-gray-700 transition-all duration-200">
+          <button @click="closeReportDialog" class="w-10 h-10 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-xl flex items-center justify-center text-slate-500 dark:text-slate-300 hover:text-slate-700 dark:hover:text-slate-100 transition-all duration-200">
               ✕
           </button>
       </div>
@@ -81,18 +97,17 @@ import { supabase } from '@/services/supabase'
 import { configStore } from '@/store/config'
 import ReportList from '@/components/ReportList.vue'
 
-// --- State ---
+// --- (所有 <script> 邏輯保持不變) ---
 const loading = ref(true)
 const error = ref(null)
-const reports = ref([]) // 只儲存目前頁面的報告
+const reports = ref([])
 const reportDialog = ref(null)
 const viewingReport = ref(null)
 const config = configStore.state
 
-// --- 分頁狀態 ---
 const currentPage = ref(1)
-const rowsPerPage = ref(20) // 每頁顯示 20 筆
-const totalReports = ref(0) // 總報告數
+const rowsPerPage = ref(20)
+const totalReports = ref(0)
 let filterTimeout = null;
 
 const filters = reactive({
@@ -103,26 +118,19 @@ const filters = reactive({
   inspector: ''
 })
 
-// --- Computed ---
-// 計算總頁數
 const totalPages = computed(() => {
     if (totalReports.value === 0) return 1;
     return Math.ceil(totalReports.value / rowsPerPage.value)
 })
 
-// --- Methods ---
-
-// fetchReports 會處理篩選和分頁
 const fetchReports = async () => {
   loading.value = true
   error.value = null
   console.log(`AdminDashboard: Fetching reports... Page: ${currentPage.value}`);
 
-  // 1. 計算分頁範圍
   const from = (currentPage.value - 1) * rowsPerPage.value;
   const to = from + rowsPerPage.value - 1;
 
-  // 2. 建立查詢 (假設 'reports' 已與 'profiles' 建立外鍵)
   let query = supabase
     .from('reports')
     .select(`
@@ -133,10 +141,9 @@ const fetchReports = async () => {
       rooms ( room_number ),
       check_types ( name ),
       profiles ( email )
-    `, { count: 'exact' }) // { count: 'exact' } 會回傳總數
+    `, { count: 'exact' }) 
     .order('created_at', { ascending: false });
 
-  // 3. 應用伺服器端篩選
   if (filters.zone_id) {
       query = query.eq('zone_id', filters.zone_id);
   }
@@ -144,39 +151,33 @@ const fetchReports = async () => {
       query = query.eq('check_type_id', filters.check_type_id);
   }
   if (filters.date) {
-      // 篩選一整天
       query = query.gte('created_at', `${filters.date}T00:00:00.000Z`);
       query = query.lte('created_at', `${filters.date}T23:59:59.999Z`);
   }
   if (filters.room_number) {
-      // 關聯篩選 (需要 'rooms' 外鍵)
       query = query.ilike('rooms.room_number', `%${filters.room_number}%`);
   }
   if (filters.inspector) {
-      // 多欄位模糊搜尋 (使用 or)
       const inspectorLower = `%${filters.inspector.toLowerCase()}%`;
       query = query.or(
           `inspector_name.ilike.${inspectorLower},profiles.email.ilike.${inspectorLower}`,
-          { foreignTable: 'profiles' } // 指定關聯表
+          { foreignTable: 'profiles' } 
       );
   }
   
-  // 4. 執行分頁查詢
   query = query.range(from, to);
   
   const { data, error: fetchError, count } = await query;
 
   if (fetchError) {
-    // 檢查是否因為 profiles 連結失敗 (如果是，就執行不含 profiles 的備用查詢)
     if (fetchError.code === 'PGRST200') {
         console.warn("關聯 profiles 失敗，嘗試備用查詢... (請檢查 RLS 與外鍵)");
-        await fetchReportsFallback(from, to); // 呼叫備用函數
-        return; // 結束此函數
+        await fetchReportsFallback(from, to);
+        return; 
     }
     error.value = `載入報告失敗: ${fetchError.message}`
     console.error("Fetch Error:", fetchError)
   } else {
-    // 格式化報告
     reports.value = data.map(r => ({
       ...r,
       dorm_zone: r.dorm_zones?.name || '未知區域',
@@ -184,13 +185,12 @@ const fetchReports = async () => {
       check_type_text: r.check_types?.name || '未知類型',
       user_email: r.profiles?.email || '未知使用者'
     }))
-    totalReports.value = count || 0; // 更新總數
+    totalReports.value = count || 0;
     console.log(`Reports loaded: ${reports.value.length} of ${count}`);
   }
   loading.value = false
 }
 
-// 備用 fetchReports (不查詢 profiles)
 const fetchReportsFallback = async (from, to) => {
     let query = supabase
         .from('reports')
@@ -204,7 +204,6 @@ const fetchReportsFallback = async (from, to) => {
         `, { count: 'exact' })
         .order('created_at', { ascending: false });
 
-    // 應用篩選 (不含 inspector email)
     if (filters.zone_id) query = query.eq('zone_id', filters.zone_id);
     if (filters.check_type_id) query = query.eq('check_type_id', filters.check_type_id);
     if (filters.date) {
@@ -235,22 +234,19 @@ const fetchReportsFallback = async (from, to) => {
     loading.value = false;
 }
 
-
-// 篩選器改變時，重設頁碼並重新獲取
 const applyFilters = () => {
     clearTimeout(filterTimeout);
-    currentPage.value = 1; // 重設到第一頁
+    currentPage.value = 1; 
     fetchReports();
 }
 const applyFiltersDebounced = () => {
     clearTimeout(filterTimeout);
     filterTimeout = setTimeout(() => {
-        currentPage.value = 1; // 重設到第一頁
+        currentPage.value = 1;
         fetchReports();
-    }, 300); // 延遲 300 毫秒
+    }, 300); 
 }
 
-// 分頁函數
 const nextPage = () => {
     if (currentPage.value < totalPages.value) {
         currentPage.value++;
@@ -264,7 +260,6 @@ const prevPage = () => {
     }
 }
 
-// 監聽篩選器
 watch(filters, applyFiltersDebounced, { deep: true });
 
 
@@ -296,13 +291,11 @@ const handleDeleteReport = async (reportId) => {
     alert(`刪除失敗: ${deleteError.message}`)
   } else {
     alert('報告已刪除')
-    // 重新載入目前頁面
     fetchReports();
   }
 }
 
 const exportAllReports = () => {
-    // 只匯出目前頁面
     if (reports.value.length === 0) {
         alert('目前頁面沒有報告可以匯出');
         return;
@@ -334,13 +327,19 @@ const clearFilteredReports = async () => {
 }
 
 
-// --- Lifecycle ---
 onMounted(fetchReports)
 
 </script>
 
 <style scoped>
-/* (樣式不變) */
+/* 【美化】: 
+  - 替換 .form-control
+  - 穿透 .report-preview-content
+*/
+.form-control {
+  @apply w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 transition-all duration-200 text-sm;
+  @apply focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20;
+}
 .dialog-content-wrapper {
   scrollbar-width: thin;
 }
@@ -348,21 +347,26 @@ onMounted(fetchReports)
   width: 8px;
 }
 .dialog-content-wrapper::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  @apply bg-slate-100 dark:bg-slate-900;
   border-radius: 10px;
 }
 .dialog-content-wrapper::-webkit-scrollbar-thumb {
-  background: #ccc;
+  @apply bg-slate-300 dark:bg-slate-600;
   border-radius: 10px;
 }
 .dialog-content-wrapper::-webkit-scrollbar-thumb:hover {
-  background: #aaa;
+  @apply bg-slate-400 dark:bg-slate-500;
 }
 .report-preview-content :deep(div) {
     word-break: break-word;
 }
-.btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+.report-preview-content :deep(strong) {
+    @apply font-semibold text-slate-700 dark:text-slate-200;
+}
+.report-preview-content :deep(a) {
+    @apply text-blue-600 dark:text-blue-400 hover:underline;
+}
+.report-preview-content :deep(img.inline-block) {
+    @apply h-10 w-10 object-cover rounded border border-slate-200 dark:border-slate-700 ml-2 align-middle;
 }
 </style>

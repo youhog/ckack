@@ -1,33 +1,34 @@
 <template>
   <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <div class="stat-card" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1))">
-          <div class="stat-icon" style="background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: white;">
+      <div class="rounded-2xl p-6 text-center bg-gradient-to-br from-blue-50 dark:from-blue-900/50 to-indigo-100 dark:to-indigo-900/30 shadow hover:shadow-md transition-shadow">
+          <div class="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-2xl shadow-lg">
               📋
           </div>
-          <div class="stat-value text-blue-600" id="totalReports">{{ stats.totalReports }}</div>
-          <div class="stat-label">總檢查報告 (全部)</div>
+          <div class="text-3xl font-bold text-blue-600 dark:text-blue-400 mb-2" id="totalReports">{{ stats.totalReports }}</div>
+          <div class="text-sm text-slate-600 dark:text-slate-400">總檢查報告 (全部)</div>
       </div>
-      <div class="stat-card" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.1))">
-          <div class="stat-icon" style="background: linear-gradient(135deg, #10b981, #059669); color: white;">
+      <div class="rounded-2xl p-6 text-center bg-gradient-to-br from-green-50 dark:from-green-900/50 to-emerald-100 dark:to-emerald-900/30 shadow hover:shadow-md transition-shadow">
+          <div class="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-2xl shadow-lg">
               ✅
           </div>
-          <div class="stat-value text-green-600" id="completedToday">{{ stats.completedToday }}</div>
-          <div class="stat-label">今日完成 (全部)</div>
+          <div class="text-3xl font-bold text-green-600 dark:text-green-400 mb-2" id="completedToday">{{ stats.completedToday }}</div>
+          <div class="text-sm text-slate-600 dark:text-slate-400">今日完成 (全部)</div>
       </div>
-      <div class="stat-card" style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(220, 38, 38, 0.1))">
-          <div class="stat-icon" style="background: linear-gradient(135deg, #ef4444, #dc2626); color: white;">
+      <div class="rounded-2xl p-6 text-center bg-gradient-to-br from-red-50 dark:from-red-900/50 to-rose-100 dark:to-rose-900/30 shadow hover:shadow-md transition-shadow">
+          <div class="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 bg-gradient-to-r from-red-500 to-rose-500 text-white text-2xl shadow-lg">
               ⚠️
           </div>
-          <div class="stat-value text-red-600" id="issuesFound">{{ stats.issuesFound }}</div>
-          <div class="stat-label">累計發現問題 (全部)</div>
+          <div class="text-3xl font-bold text-red-600 dark:text-red-400 mb-2" id="issuesFound">{{ stats.issuesFound }}</div>
+          <div class="text-sm text-slate-600 dark:text-slate-400">累計發現問題 (全部)</div>
       </div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { supabase } from '../services/supabase'
+import { supabase } from '../services/supabase' //
 
+// --- (所有 <script> 邏輯保持不變) ---
 const stats = ref({
   totalReports: 0,
   completedToday: 0,
@@ -35,11 +36,9 @@ const stats = ref({
 })
 
 const fetchAdminStats = async () => {
-  // 由於這是 Admin 元件，RLS 策略 (get_my_role() = 'admin') 
-  // 會確保我們能查詢所有報告
-  const { data, error, count } = await supabase
-    .from('reports')
-    .select('*', { count: 'exact' }) // 獲取總數
+  const { data, error, count } = await supabase //
+    .from('reports') //
+    .select('*', { count: 'exact' }) 
   
   if (error) {
     console.error("載入管理統計失敗:", error)
@@ -62,6 +61,5 @@ const fetchAdminStats = async () => {
   }
 }
 
-// 元件掛載時，獲取最新統計數據
 onMounted(fetchAdminStats)
 </script>

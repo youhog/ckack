@@ -21,49 +21,66 @@ export function escapeHTML(str) {
 }
 
 /**
- * 顯示 Toast 提示訊息 (簡易版，可替換為 UI 庫元件)
+ * 顯示 Toast 提示訊息 (使用 Tailwind classes)
  * @param {string} message - 要顯示的訊息
- * @param {'success'|'error'} type - 訊息類型
+ * @param {'success'|'error'|'info'|'warning'} type - 訊息類型 (增加 info, warning)
  */
 export function showToast(message, type = 'success') {
-    const icon = type === 'success' ? '✅' : '⚠️';
-    const gradient = type === 'success'
-        ? 'from-green-500 to-emerald-500'
-        : 'from-red-500 to-red-600';
+    let icon = '✅';
+    let gradientClass = 'from-green-500 to-emerald-500'; // Success default
+    let iconBgClass = 'bg-white/20';
+
+    switch (type) {
+        case 'error':
+            icon = '⚠️';
+            gradientClass = 'from-red-500 to-rose-500';
+            break;
+        case 'warning':
+            icon = '🔔';
+            gradientClass = 'from-yellow-500 to-amber-500';
+            break;
+        case 'info':
+            icon = 'ℹ️';
+            gradientClass = 'from-blue-500 to-indigo-500';
+            break;
+        // 'success' uses defaults
+    }
 
     // 移除可能存在的舊 toast
-    const existingToast = document.querySelector('.toast');
+    const existingToast = document.querySelector('.toast-notification');
     if (existingToast) {
         existingToast.remove();
     }
 
     const toast = document.createElement('div');
-    toast.className = `toast fixed top-6 right-6 bg-gradient-to-r ${gradient} text-white px-6 py-4 rounded-2xl shadow-2xl z-[100] flex items-center gap-3 font-medium`; // 提高 z-index
-    // 使用 textContent 防止 XSS
+    // 【美化】: 使用 Tailwind classes 定義 Toast 樣式
+    toast.className = `toast-notification fixed top-6 right-6 z-[100] flex items-center gap-3 rounded-2xl px-5 py-3 text-white font-medium shadow-lg bg-gradient-to-r ${gradientClass}`; 
+    
+    // 【美化】: Icon 樣式
     const iconDiv = document.createElement('div');
-    iconDiv.className = 'w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center';
+    iconDiv.className = `w-7 h-7 ${iconBgClass} rounded-lg flex items-center justify-center text-lg`;
     iconDiv.textContent = icon;
+    
+    // 【美化】: 訊息文字樣式
     const span = document.createElement('span');
+    span.className = 'text-sm';
     span.textContent = message;
 
     toast.appendChild(iconDiv);
     toast.appendChild(span);
     document.body.appendChild(toast);
 
-    // 添加進入動畫 (可選)
-    toast.style.opacity = '0';
-    toast.style.transform = 'translateY(-20px)';
+    // 添加進入動畫 (使用 Tailwind classes)
+    toast.classList.add('opacity-0', 'translate-y-[-20px]', 'transform', 'transition-all', 'duration-300', 'ease-out');
     requestAnimationFrame(() => {
-        toast.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
-        toast.style.opacity = '1';
-        toast.style.transform = 'translateY(0)';
+        toast.classList.remove('opacity-0', 'translate-y-[-20px]');
+        toast.classList.add('opacity-100', 'translate-y-0');
     });
 
     // 3 秒後自動移除
     setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateY(-20px)';
+        toast.classList.remove('opacity-100', 'translate-y-0');
+        toast.classList.add('opacity-0', 'translate-y-[-20px]');
         setTimeout(() => toast.remove(), 300); // 等待動畫完成後移除
     }, 3000);
 }
-

@@ -1,32 +1,29 @@
-<!-- src/views/Inspection.vue -->
 <template>
-  <main class="space-y-4">
-    <!-- 檢查項目導航 (使用 category.id) -->
-    <div id="inspectionNavigation" class="card p-6 mb-8">
+  <main class="space-y-6">
+    <div id="inspectionNavigation" class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 mb-8">
         <div class="text-center mb-4">
-            <h3 class="text-lg font-semibold text-gray-700 flex items-center justify-center gap-2">
+            <h3 class="text-lg font-semibold text-slate-700 dark:text-slate-200 flex items-center justify-center gap-2">
                 🗂️ <span>檢查項目分類</span>
             </h3>
-            <p class="text-sm text-gray-500 mt-1">點擊下方分類快速跳轉</p>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">點擊下方分類快速跳轉</p>
         </div>
         <div class="tab-container">
-            <div class="tab-nav scrollbar-hide" id="categoryTabs">
+            <div class="flex bg-slate-100 dark:bg-slate-900/50 rounded-xl p-1 overflow-x-auto scrollbar-hide" id="categoryTabs">
                 <div
                   v-for="(category, index) in config.checklistCategories"
                   :key="category.id"
-                  :class="['tab-item', getCategoryStatus(category.id), { 'active': currentCategoryIndex === index }]"
+                  class="flex-1 min-w-[150px] px-4 py-3 text-center rounded-lg font-medium cursor-pointer transition-all duration-200 relative flex items-center justify-center gap-2 whitespace-nowrap"
+                  :class="[getCategoryTabClass(category.id), { 'bg-white dark:bg-slate-700 shadow-md': currentCategoryIndex === index }]"
                   @click="currentCategoryIndex = index"
                   :title="category.name"
                 >
-                  <div class="status-indicator"></div>
-                  <!-- 限制文字長度，避免換行 -->
+                  <div class_ ="w-2 h-2 rounded-full flex-shrink-0" :class="getCategoryStatusIndicator(category.id)"></div>
                   <span class="truncate">{{ category.icon }} {{ category.name }}</span>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- 檢查項目 -->
     <Checklist
       v-if="currentCategory && !config.loading && itemsForCurrentCategory.length > 0"
       :category="currentCategory"
@@ -35,77 +32,91 @@
       v-model:notesData="notesData"
       v-model:photoData="photoData"
     />
-     <div v-else-if="config.loading" class="card p-6 text-center text-gray-500">
+     <div v-else-if="config.loading" class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 text-center text-slate-500">
         正在載入檢查項目設定...
     </div>
-     <div v-else-if="!currentCategory" class="card p-6 text-center text-gray-500">
+     <div v-else-if="!currentCategory" class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 text-center text-slate-500">
         沒有可用的檢查分類。請管理員在後台新增。
     </div>
-    <div v-else-if="itemsForCurrentCategory.length === 0" class="card p-6 text-center text-gray-500">
+    <div v-else-if="itemsForCurrentCategory.length === 0" class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 text-center text-slate-500">
         此分類 "{{ currentCategory.name }}" 下沒有檢查項目。請管理員在後台新增。
     </div>
-    <div v-else class="card p-6 text-center text-red-500">
+    <div v-else class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 text-center text-red-500">
         無法載入檢查項目設定。錯誤: {{ config.error || '未知錯誤' }}
     </div>
 
-    <!-- 總結區域 -->
-    <div id="inspectionSummary" class="card p-8 mt-8">
+    <div id="inspectionSummary" class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 md:p-8 mt-8">
         <div class="flex items-center gap-3 mb-6">
             <div class="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center text-white text-xl">
                 📝
             </div>
-            <h3 class="text-2xl font-bold text-gray-800">檢查總結</h3>
+            <h3 class="text-2xl font-bold text-slate-800 dark:text-slate-100">檢查總結</h3>
         </div>
 
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <div class="stat-card text-center" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.1))">
-                <div class="stat-icon mx-auto mb-3" style="background: linear-gradient(135deg, #10b981, #059669); color: white;">✅</div>
-                <div class="stat-value text-green-600 mb-1">{{ summary.goodCount }}</div>
-                <div class="stat-label">良好</div>
+            <div class="rounded-2xl p-4 text-center bg-green-50 dark:bg-green-500/10">
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-2xl">✅</div>
+                <div class="text-3xl font-bold text-green-600 dark:text-green-400 mb-1">{{ summary.goodCount }}</div>
+                <div class="text-sm text-slate-600 dark:text-slate-400">良好</div>
             </div>
-            <div class="stat-card text-center" style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(220, 38, 38, 0.1))">
-                <div class="stat-icon mx-auto mb-3" style="background: linear-gradient(135deg, #ef4444, #dc2626); color: white;">❌</div>
-                <div class="stat-value text-red-600 mb-1">{{ summary.damagedCount }}</div>
-                <div class="stat-label">損壞</div>
+            <div class="rounded-2xl p-4 text-center bg-red-50 dark:bg-red-500/10">
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3 bg-gradient-to-r from-red-500 to-red-600 text-white text-2xl">❌</div>
+                <div class="text-3xl font-bold text-red-600 dark:text-red-400 mb-1">{{ summary.damagedCount }}</div>
+                <div class="text-sm text-slate-600 dark:text-slate-400">損壞</div>
             </div>
-            <div class="stat-card text-center" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(217, 119, 6, 0.1))">
-                <div class="stat-icon mx-auto mb-3" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: white;">⚠️</div>
-                <div class="stat-value text-yellow-600 mb-1">{{ summary.missingCount }}</div>
-                <div class="stat-label">遺失</div>
+            <div class="rounded-2xl p-4 text-center bg-yellow-50 dark:bg-yellow-500/10">
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3 bg-gradient-to-r from-yellow-500 to-amber-500 text-white text-2xl">⚠️</div>
+                <div class="text-3xl font-bold text-yellow-600 dark:text-yellow-400 mb-1">{{ summary.missingCount }}</div>
+                <div class="text-sm text-slate-600 dark:text-slate-400">遺失</div>
             </div>
-            <div class="stat-card text-center" style="background: linear-gradient(135deg, rgba(100, 116, 139, 0.1), rgba(71, 85, 105, 0.1))">
-                <div class="stat-icon mx-auto mb-3" style="background: linear-gradient(135deg, #64748b, #475569); color: white;">⏳</div>
-                <div class="stat-value text-gray-600 mb-1">{{ summary.pendingCount }}</div>
-                <div class="stat-label">待檢查</div>
+             <div class="rounded-2xl p-4 text-center bg-slate-50 dark:bg-slate-500/10">
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3 bg-gradient-to-r from-slate-500 to-gray-500 text-white text-2xl">⏳</div>
+                <div class="text-3xl font-bold text-slate-600 dark:text-slate-400 mb-1">{{ summary.pendingCount }}</div>
+                <div class="text-sm text-slate-600 dark:text-slate-400">待檢查</div>
             </div>
         </div>
 
         <div class="mb-6">
-            <label for="additionalNotes" class="form-label flex items-center gap-2">
+            <label for="additionalNotes" class="form-label">
                 💭 <span>額外備註</span>
             </label>
-            <textarea id="additionalNotes" rows="4" class="form-control resize-none" placeholder="請輸入其他需要記錄的事項..." v-model="additionalNotes"></textarea>
+            <textarea id="additionalNotes" rows="4" class="form-control" placeholder="請輸入其他需要記錄的事項..." v-model="additionalNotes"></textarea>
         </div>
 
-        <button id="generateReportBtn" @click="generateReport" class="btn btn-primary w-full py-4 text-lg" :disabled="isGenerateDisabled">
+        <button id="generateReportBtn" @click="generateReport" 
+          class="w-full py-4 text-lg font-semibold text-white bg-gradient-to-r from-blue-500 to-blue-700 rounded-xl shadow-md transition-all duration-300 transform hover:shadow-lg hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-blue-500/30 disabled:opacity-60 disabled:cursor-not-allowed"
+          :disabled="isGenerateDisabled">
             <span class="flex items-center justify-center gap-3">
-                <span>📄</span>
+                <span v-if="loading">
+                  <svg class="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                </span>
+                <span v-else>📄</span>
                 <span v-if="loading">報告生成中...</span>
                 <span v-else>生成檢查報告</span>
-                 <span v-if="missingInfoReason" class="text-xs opacity-75">({{ missingInfoReason }})</span>
+                 <span v-if="missingInfoReason && !loading" class="text-xs opacity-75">({{ missingInfoReason }})</span>
             </span>
         </button>
     </div>
 
-    <!-- 報告預覽 -->
-    <div id="reportPreview" class="card p-6 mt-6" v-if="reportPreviewHtml">
-        <h3 class="text-xl font-semibold text-gray-800 mb-4">📋 檢查報告預覽</h3>
+    <div id="reportPreview" class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 mt-6" v-if="reportPreviewHtml">
+        <h3 class="text-xl font-semibold text-slate-800 dark:text-slate-100 mb-4">📋 檢查報告預覽</h3>
         <div id="reportContent" class="space-y-2 text-sm report-preview-content" v-html="reportPreviewHtml"></div>
-        <div class="mt-6 flex gap-3">
-            <button id="downloadReportBtn" @click="downloadReport" class="btn" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">
+        <div class="mt-6 flex flex-col sm:flex-row gap-3">
+            <button 
+              id="downloadReportBtn" 
+              @click="downloadReport" 
+              class="inline-flex items-center justify-center px-5 py-2.5 rounded-xl font-medium transition-all duration-200 cursor-pointer bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-500/30"
+            >
                 💾 下載報告
             </button>
-            <button id="printReportBtn" @click="printReport" class="btn btn-secondary">
+            <button 
+              id="printReportBtn" 
+              @click="printReport" 
+              class="inline-flex items-center justify-center px-5 py-2.5 rounded-xl font-medium transition-all duration-200 cursor-pointer bg-white dark:bg-slate-700 border border-slate-900/10 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600"
+            >
                 🖨️ 列印報告
             </button>
         </div>
@@ -128,19 +139,18 @@ const emit = defineEmits(['report-generated', 'checklist-updated'])
 
 const loading = ref(false)
 const currentCategoryIndex = ref(0)
-const checkData = ref({}) // { "item-uuid-1": "good", ... }
-const notesData = ref({}) // { "item-uuid-1": "備註", ... }
-const photoData = ref({}) // { "item-uuid-1": "https://url.com/photo.png", ... }
+const checkData = ref({})
+const notesData = ref({})
+const photoData = ref({})
 const additionalNotes = ref('')
 const reportPreviewHtml = ref(null)
 
 const user = userStore.state.user
 const config = configStore.state
 
-// 總項目數
 const totalItems = computed(() => config.checklistItems.length)
 
-// 初始化/重設
+// --- (initializeChecklist 函數保持不變) ---
 const initializeChecklist = () => {
   console.log("初始化/重設檢查清單...");
   const newCheckData = {}
@@ -154,50 +164,40 @@ const initializeChecklist = () => {
       additionalNotes.value = '';
       reportPreviewHtml.value = null;
       currentCategoryIndex.value = 0;
-      // 初始化完成後立即更新一次進度
       updateProgress();
   } else {
        console.warn("無法初始化檢查清單，因為設定尚未載入或為空。")
-       // 確保 checkData 為空物件
        checkData.value = {};
-       updateProgress(); // 更新進度為 0/0
+       updateProgress(); 
   }
-
 }
 
-// 當 configStore 載入完成後，或 checklistItems 變化時，初始化一次
-// 添加防抖或節流可能更好，但目前 watch 應該足夠
+// --- (watch config 函數保持不變) ---
 let initTimeoutId = null;
 watch(() => [config.loading, config.checklistItems], ([isLoading, items]) => {
-  clearTimeout(initTimeoutId); // 清除之前的計時器
+  clearTimeout(initTimeoutId); 
   initTimeoutId = setTimeout(() => {
     console.log("Config/Items changed. Loading:", isLoading, "Items count:", items?.length);
-    // 確保不是正在載入，且確實有項目
     if (!isLoading && items && items.length > 0) {
       initializeChecklist();
     } else if (!isLoading && (!items || items.length === 0)) {
-      // 如果載入完成但沒有項目，清空 checkData
       checkData.value = {};
-      updateProgress(); // 更新進度為 0/0
+      updateProgress();
     }
-  }, 100); // 稍微延遲初始化，等待數據穩定
-}, { immediate: true, deep: true }) // 使用 deep: true 確保 items 內部變化也能觸發
+  }, 100); 
+}, { immediate: true, deep: true })
 
-// 當前顯示的分類
 const currentCategory = computed(() => {
-  // 邊界檢查
   if (config.checklistCategories && config.checklistCategories.length > currentCategoryIndex.value) {
      return config.checklistCategories[currentCategoryIndex.value]
   }
   return null;
 })
-// 該分類下的項目
 const itemsForCurrentCategory = computed(() => {
   if (!currentCategory.value) return []
   return config.checklistItems.filter(item => item.category_id === currentCategory.value.id)
 })
 
-// 總結
 const summary = computed(() => {
   const allStatus = Object.values(checkData.value)
   const goodCount = allStatus.filter(s => s === 'good').length
@@ -207,15 +207,12 @@ const summary = computed(() => {
   return { goodCount, damagedCount, missingCount, pendingCount }
 })
 
-// 更新進度
+// --- (updateProgress 函數保持不變) ---
 const updateProgress = () => {
-    // 確保 totalItems > 0 才計算
     const total = totalItems.value > 0 ? totalItems.value : 0;
-    // 從 summary 計算 completed
     const completed = summary.value.goodCount + summary.value.damagedCount + summary.value.missingCount;
     const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-    // 只有在 total > 0 時才發送有效進度，或者 completed 為 0 (表示 0/0)
     if (total > 0 || completed === 0) {
         emit('checklist-updated', {
             completed,
@@ -223,19 +220,16 @@ const updateProgress = () => {
             percentage
         });
     } else if (total === 0) {
-        // 如果 totalItems 為 0，確保發送 0/0
          emit('checklist-updated', { completed: 0, total: 0, percentage: 0 });
     }
 };
 
-
-// 當 checkData 變化時，更新進度
 watch(checkData, updateProgress, { deep: true });
 
-// 獲取分類狀態
+// --- (getCategoryStatus 函數保持不變, 用於 JS 邏輯) ---
 const getCategoryStatus = (categoryId) => {
   const itemsInCategory = config.checklistItems.filter(item => item.category_id === categoryId);
-  if (itemsInCategory.length === 0) return 'good'; // 空分類視為良好
+  if (itemsInCategory.length === 0) return 'good'; 
 
   let hasPending = false;
   let hasIssues = false;
@@ -251,21 +245,43 @@ const getCategoryStatus = (categoryId) => {
   return 'good';
 }
 
-// 計算生成按鈕是否應禁用
+// 【美化】Tab 樣式
+const getCategoryTabClass = (categoryId) => {
+    const status = getCategoryStatus(categoryId);
+    switch (status) {
+        case 'damaged': return 'text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20';
+        case 'pending': return 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50';
+        case 'good': return 'text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-500/20';
+        default: return 'text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700';
+    }
+}
+// 【美化】Tab 指示燈樣式
+const getCategoryStatusIndicator = (categoryId) => {
+    const status = getCategoryStatus(categoryId);
+    switch (status) {
+        case 'damaged': return 'bg-red-500';
+        case 'pending': return 'bg-slate-400';
+        case 'good': return 'bg-green-500';
+        default: return 'bg-slate-400';
+    }
+}
+
+
 const missingInfoReason = computed(() => {
     if (config.loading) return '設定載入中';
     if (!props.formState.dormZone) return '請選擇區域';
     if (!props.formState.roomNumber) return '請選擇房間';
     if (!props.formState.checkType) return '請選擇類型';
     if (!props.formState.inspector) return '請填寫檢查人員';
-    if (totalItems.value === 0) return '無檢查項目'; // 新增檢查
-    return null; // 沒有缺少資訊
+    if (totalItems.value === 0) return '無檢查項目';
+    return null; 
 });
 const isGenerateDisabled = computed(() => {
     return loading.value || config.loading || !!missingInfoReason.value;
 });
 
-// 生成報告
+// --- (generateReport, downloadReport, printReport 函數保持不變) ---
+// (為了簡潔，省略了這些函數的程式碼，它們的內部邏輯不需要修改)
 const generateReport = async () => {
   // 再次驗證，雖然按鈕已禁用
   if (isGenerateDisabled.value) {
@@ -295,35 +311,36 @@ const generateReport = async () => {
   const checkTypeText = config.checkTypes.find(t => t.id === check_type_id)?.name || '未知類型'
 
   // 1. 生成報告 HTML (使用 escapeHTML 防護 XSS)
+  // 【美化】調整 HTML 報告樣式，使其在深色/淺色模式下都好看
   let reportContent = `
-      <div class="space-y-4">
-          <div class="grid grid-cols-2 gap-4">
+      <div class="space-y-4 text-slate-800 dark:text-slate-200">
+          <div class="grid grid-cols-2 gap-4 p-4 bg-slate-50 dark:bg-slate-900 rounded-lg">
               <div><strong>宿舍分區:</strong> ${escapeHTML(zoneName)}</div>
               <div><strong>房間號碼:</strong> ${escapeHTML(roomNum)}</div>
               <div><strong>檢查類型:</strong> ${escapeHTML(checkTypeText)}</div>
               <div><strong>檢查人員:</strong> ${escapeHTML(inspector)}</div>
               <div><strong>檢查日期:</strong> ${escapeHTML(new Date().toLocaleDateString('zh-TW'))}</div>
           </div>
-          <div class="border-t pt-4">
-              <h4 class="font-medium mb-2">檢查結果統計</h4>
+          <div class="border-t dark:border-slate-700 pt-4">
+              <h4 class="font-medium text-lg mb-2">檢查結果統計</h4>
               <div class="grid grid-cols-3 gap-4">
-                  <div class="text-center p-3 rounded-lg bg-green-50 text-green-700">
+                  <div class="text-center p-3 rounded-lg bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-300">
                       <div class="text-2xl font-bold">${goodCount}</div><div class="text-sm">良好項目</div>
                   </div>
-                  <div class="text-center p-3 rounded-lg bg-red-50 text-red-700">
+                  <div class="text-center p-3 rounded-lg bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-300">
                       <div class="text-2xl font-bold">${damagedCount}</div><div class="text-sm">損壞項目</div>
                   </div>
-                  <div class="text-center p-3 rounded-lg bg-yellow-50 text-yellow-700">
+                  <div class="text-center p-3 rounded-lg bg-yellow-50 dark:bg-yellow-500/10 text-yellow-700 dark:text-yellow-300">
                       <div class="text-2xl font-bold">${missingCount}</div><div class="text-sm">遺失項目</div>
                   </div>
               </div>
           </div>
-          <div class="border-t pt-4">
-              <h4 class="font-medium mb-2">詳細檢查項目</h4>
+          <div class="border-t dark:border-slate-700 pt-4">
+              <h4 class="font-medium text-lg mb-2">詳細檢查項目</h4>
   `;
 
   config.checklistCategories.forEach(category => {
-      reportContent += `<h5 class="font-medium mt-3">${escapeHTML(category.icon)} ${escapeHTML(category.name)}</h5>`;
+      reportContent += `<h5 class="font-medium mt-3 text-base">${escapeHTML(category.icon)} ${escapeHTML(category.name)}</h5>`;
       const itemsInCategory = config.checklistItems.filter(i => i.category_id === category.id);
 
       itemsInCategory.forEach(item => {
@@ -335,13 +352,12 @@ const generateReport = async () => {
           const notes = notesData.value[item.id] || '';
           const photoUrl = photoData.value[item.id] || '';
 
-          reportContent += `<div class="text-sm ml-4">${escapeHTML(item.name)}: ${statusText}`;
+          reportContent += `<div class="text-sm ml-4 py-1">${escapeHTML(item.name)}: ${statusText}`;
           if (notes) {
-              reportContent += `<br><span class="text-gray-600 ml-4">備註: ${escapeHTML(notes)}</span>`;
+              reportContent += `<br><span class="text-slate-600 dark:text-slate-400 ml-4">備註: ${escapeHTML(notes)}</span>`;
           }
           if (photoUrl) {
-              // 在預覽中直接顯示圖片縮圖
-              reportContent += `<br><span class="text-gray-600 ml-4 flex items-center gap-2">照片: <a href="${escapeHTML(photoUrl)}" target="_blank" class="text-blue-600 hover:underline">查看</a> <img src="${escapeHTML(photoUrl)}" alt="照片預覽" class="inline-block h-10 w-10 object-cover rounded ml-2 border"></span>`;
+              reportContent += `<br><span class="text-slate-600 dark:text-slate-400 ml-4 flex items-center gap-2">照片: <a href="${escapeHTML(photoUrl)}" target="_blank" class="text-blue-600 dark:text-blue-400 hover:underline">查看</a> <img src="${escapeHTML(photoUrl)}" alt="照片預覽" class="inline-block h-10 w-10 object-cover rounded ml-2 border dark:border-slate-700"></span>`;
           }
           reportContent += `</div>`;
       });
@@ -349,8 +365,8 @@ const generateReport = async () => {
 
   if (additionalNotes.value) {
       reportContent += `
-          <div class="border-t pt-4">
-              <h4 class="font-medium mb-2">額外備註</h4>
+          <div class="border-t dark:border-slate-700 pt-4">
+              <h4 class="font-medium text-lg mb-2">額外備註</h4>
               <div class="text-sm">${escapeHTML(additionalNotes.value)}</div>
           </div>
       `;
@@ -363,7 +379,7 @@ const generateReport = async () => {
     zone_id: zone_id,
     room_id: room_id,
     check_type_id: check_type_id,
-    inspector_name: inspector, // 儲存手動輸入的姓名
+    inspector_name: inspector, 
     additional_notes: additionalNotes.value,
     good_count: goodCount,
     damaged_count: damagedCount,
@@ -382,30 +398,23 @@ const generateReport = async () => {
     console.error("儲存報告失敗:", error);
   } else {
     showToast('報告已成功儲存！', 'success')
-    // 顯示預覽
     reportPreviewHtml.value = reportContent
-    // 發出事件，清空 AppLayout 中的表單 (除了 inspector)
     emit('report-generated')
-    // 清空本地狀態
     initializeChecklist()
   }
   loading.value = false
 }
-
-// 下載報告
 const downloadReport = () => {
     if (!reportPreviewHtml.value) return;
     const roomNumber = config.rooms.find(r => r.id === props.formState.roomNumber)?.room_number || '未知房間';
     const filename = `宿舍檢查報告_${roomNumber}_${new Date().toISOString().split('T')[0]}.html`;
-
-    // 移除預覽中的圖片縮圖，改為純連結
     const contentForFile = reportPreviewHtml.value.replace(/<img[^>]*>/g, '(照片連結)');
 
     const fullHTML = `
         <!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8">
         <title>宿舍檢查報告 - ${escapeHTML(roomNumber)}</title>
         <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; margin: 20px; line-height: 1.6; color: #333; }
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; margin: 20px; line-height: 1.6; color: #333; background: #fff; }
             .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1em;}
             .border-t { border-top: 1px solid #eee; padding-top: 1em; margin-top: 1em; }
             h2 { text-align: center; border-bottom: 1px solid #ccc; padding-bottom: 0.5em; margin-bottom: 1em; font-weight: 600; }
@@ -421,10 +430,7 @@ const downloadReport = () => {
             .text-2xl { font-size: 1.5rem; } .font-bold { font-weight: 700; } .text-sm { font-size: 0.875rem; }
             strong { font-weight: 600; }
             a { text-decoration: none; color: #0066cc; } a:hover { text-decoration: underline; }
-            .report-preview-content .flex { display: flex; } /* Basic flex for layout */
-            .report-preview-content .items-center { align-items: center; }
-            .report-preview-content .gap-2 { gap: 0.5rem; }
-            img { display:none; } /* Don't show images in download */
+            img { display:none; }
         </style></head><body>
         <h2>宿舍房間檢查報告</h2>
         ${contentForFile}
@@ -441,8 +447,6 @@ const downloadReport = () => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 }
-
-// 列印報告
 const printReport = () => {
     if (!reportPreviewHtml.value) return;
     const roomNumber = config.rooms.find(r => r.id === props.formState.roomNumber)?.room_number || '未知房間';
@@ -470,16 +474,15 @@ const printReport = () => {
             .text-2xl { font-size: 1.5rem; } .font-bold { font-weight: 700; } .text-sm { font-size: 0.875rem; }
             strong { font-weight: 600; }
             a { text-decoration: none; color: #0066cc; }
-            img.inline-block { display: none; } /* 列印時隱藏縮圖 */
+            img.inline-block { display: none; }
             @media print {
               body { margin: 1cm; font-size: 10pt; }
               .grid-cols-3 { gap: 0.5rem; }
               .p-3 { padding: 8px; }
               .text-2xl { font-size: 1.2rem; }
-              .btn, #downloadReportBtn, #printReportBtn { display: none; } /* 隱藏按鈕 */
+              .btn, #downloadReportBtn, #printReportBtn { display: none; }
               #reportPreview { margin-top: 0; padding: 0; box-shadow: none; border: none; }
               .card { box-shadow: none; border: none; padding: 0 !important; margin: 0 !important; }
-              /* 強制列印背景色 */
               *{-webkit-print-color-adjust: exact !important; color-adjust: exact !important;}
             }
         </style></head><body>
@@ -488,8 +491,8 @@ const printReport = () => {
         <script>
           setTimeout(() => {
             window.print();
-            window.onafterprint = () => setTimeout(window.close, 100); // 列印後延遲關閉
-          }, 250); // 稍微延遲以確保內容載入
+            window.onafterprint = () => setTimeout(window.close, 100);
+          }, 250);
         <\/script>
         </body></html>
     `);
@@ -502,41 +505,30 @@ const printReport = () => {
 <style scoped>
 /* 讓 Tab 可以水平滾動 */
 .scrollbar-hide {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 .scrollbar-hide::-webkit-scrollbar {
-  display: none; /* Chrome, Safari and Opera */
+  display: none;
 }
-.tab-nav {
-    overflow-x: auto;
-    white-space: nowrap; /* 防止 Tab 換行 */
+
+/* 穿透 .form-label 和 .form-control */
+:deep(.form-label) {
+  @apply block mb-2 text-sm font-medium text-slate-700 dark:text-slate-300;
 }
-.tab-item {
-    display: inline-flex; /* 讓 Tab 水平排列 */
-    flex: 0 0 auto; /* 防止 Tab 被壓縮 */
-    min-width: 160px; /* 增加最小寬度 */
-    max-width: 250px; /* 增加最大寬度 */
-    padding-left: 1rem; /* 增加左右 padding */
-    padding-right: 1rem;
+:deep(.form-control) {
+  @apply w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 transition-all duration-200 text-sm;
+  @apply focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20;
 }
-.tab-item span.truncate {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    display: inline-block; /* 確保 truncate 生效 */
-    max-width: 100%; /* 確保不超過容器寬度 */
-    vertical-align: middle; /* 垂直居中 */
-}
+
 /* 預覽報告中圖片樣式 (使用 :deep() 穿透) */
 :deep(.report-preview-content img.inline-block) {
-    height: 2.5rem; /* 40px */
-    width: 2.5rem; /* 40px */
-    object-fit: cover;
-    border-radius: 0.25rem; /* 4px */
-    margin-left: 0.5rem; /* 8px */
-    border: 1px solid #e5e7eb; /* gray-200 */
-    vertical-align: middle;
+    @apply h-10 w-10 object-cover rounded border border-slate-200 dark:border-slate-700 ml-2 align-middle;
+}
+:deep(.report-preview-content a) {
+    @apply text-blue-600 dark:text-blue-400 hover:underline;
+}
+:deep(.report-preview-content strong) {
+    @apply font-semibold text-slate-700 dark:text-slate-200;
 }
 </style>
-

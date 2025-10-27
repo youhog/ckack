@@ -1,9 +1,9 @@
 <template>
-  <div class="night-gradient min-h-screen relative overflow-hidden">
-    <div class="stars absolute top-0 left-0 w-full h-full" id="stars"></div>
+  <div class="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-900 to-purple-900">
+    <div class="stars absolute top-0 left-0 w-full h-full pointer-events-none" id="stars"></div>
 
     <main class="min-h-screen flex items-center justify-center px-4 py-12 relative z-10">
-      <div class="login-card rounded-2xl p-8 w-full max-w-md">
+      <div class="w-full max-w-md p-8 bg-white/10 dark:bg-black/20 backdrop-blur-lg border border-white/20 rounded-2xl shadow-xl">
         <div class="text-center mb-8">
           <div class="text-4xl mb-4">🌙</div>
           <h1 class="text-3xl font-bold text-white mb-2">宿舍檢查系統</h1>
@@ -20,7 +20,8 @@
               id="account"
               name="account"
               required
-              v-model="email" class="input-glow w-full px-4 py-3 bg-white bg-opacity-10 border border-white border-opacity-30 rounded-lg text-white placeholder-blue-200 focus:outline-none focus:border-indigo-400 transition-all duration-300"
+              v-model="email" 
+              class="w-full px-4 py-3 bg-white/10 border border-white/30 rounded-lg text-white placeholder-blue-200/70 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/50 transition-all duration-300"
               placeholder="請輸入帳號 (無需輸入 @網域)"
             />
           </div>
@@ -35,22 +36,22 @@
               name="password"
               required
               v-model="password"
-              class="input-glow w-full px-4 py-3 bg-white bg-opacity-10 border border-white border-opacity-30 rounded-lg text-white placeholder-blue-200 focus:outline-none focus:border-indigo-400 transition-all duration-300"
+              class="w-full px-4 py-3 bg-white/10 border border-white/30 rounded-lg text-white placeholder-blue-200/70 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/50 transition-all duration-300"
               placeholder="請輸入密碼"
             />
           </div>
 
-          <div v-if="errorMsg" class="p-3 rounded-lg bg-red-500 bg-opacity-20 border border-red-400 text-red-200 text-sm">
+          <div v-if="errorMsg" class="p-3 rounded-lg bg-red-500/20 border border-red-400 text-red-200 text-sm">
             {{ errorMsg }}
           </div>
-          <div v-if="successMsg" class="p-3 rounded-lg bg-green-500 bg-opacity-20 border border-green-400 text-green-200 text-sm">
+          <div v-if="successMsg" class="p-3 rounded-lg bg-green-500/20 border border-green-400 text-green-200 text-sm">
             {{ successMsg }}
           </div>
 
           <button
             type="submit"
             :disabled="loading"
-            class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
+            class="w-full flex items-center justify-center bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 disabled:opacity-70 disabled:cursor-not-allowed"
           >
              <span v-if="loading" class="flex items-center">
                 <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -66,7 +67,11 @@
         <div class="mt-6 text-center">
           <p class="text-blue-200 text-sm">
             還沒有帳號？
-            <button @click="handleSignUp" :disabled="loading" class="font-medium text-indigo-300 hover:text-indigo-200 transition-colors disabled:opacity-70 disabled:cursor-not-allowed">
+            <button 
+              @click="handleSignUp" 
+              :disabled="loading" 
+              class="font-medium text-indigo-300 hover:text-indigo-100 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+            >
               立即註冊
             </button>
           </p>
@@ -81,50 +86,53 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '../services/supabase' //
-// 假設您已經建立了 constants.js 檔案
-import { DEFAULT_EMAIL_DOMAIN } from '../utils/constants'
+import { DEFAULT_EMAIL_DOMAIN } from '../utils/constants' //
 
-// --- Star Animation Logic ---
+// --- 星星動畫邏輯 (保持不變) ---
 function createStars() {
   const starsContainer = document.getElementById('stars');
   if (!starsContainer) return;
-  starsContainer.innerHTML = '';
-  const numberOfStars = 50;
+  starsContainer.innerHTML = ''; // 清空舊星星
+  const numberOfStars = 70; // 增加星星數量
 
   for (let i = 0; i < numberOfStars; i++) {
     const star = document.createElement('div');
-    star.className = 'star';
+    star.className = 'star'; // 使用 class 方便 CSS 控制
+    // 使用 Tailwind classes 控制樣式
+    star.classList.add('absolute', 'bg-white', 'rounded-full'); 
     star.style.left = Math.random() * 100 + '%';
     star.style.top = Math.random() * 100 + '%';
-    star.style.width = Math.random() * 3 + 1 + 'px';
-    star.style.height = star.style.width;
-    star.style.animationDelay = Math.random() * 2 + 's';
-    star.style.animationDuration = (Math.random() * 3 + 2) + 's';
+    const size = Math.random() * 2 + 0.5; // 調整大小範圍
+    star.style.width = size + 'px';
+    star.style.height = size + 'px';
+    // 動畫參數
+    star.style.animationName = 'twinkle';
+    star.style.animationTimingFunction = 'ease-in-out';
+    star.style.animationIterationCount = 'infinite';
+    star.style.animationDelay = Math.random() * 3 + 's'; // 增加延遲變化
+    star.style.animationDuration = (Math.random() * 4 + 3) + 's'; // 增加持續時間變化
     starsContainer.appendChild(star);
   }
 }
 
-// --- Vue Component Logic ---
+// --- Vue 組件邏輯 (保持不變) ---
 const router = useRouter()
-const email = ref('') // 雖然 Label 改了，但變數名稱保持 email，因為後端 API 仍需要 Email 格式
+const email = ref('')
 const password = ref('')
 const loading = ref(false)
 const errorMsg = ref(null)
 const successMsg = ref(null)
 
-// Call createStars when the component is mounted
 onMounted(() => {
   createStars();
 });
 
-// Helper function to format email
 const formatEmail = (inputEmail) => {
-  // 檢查 DEFAULT_EMAIL_DOMAIN 是否已定義且為字串
   const domain = typeof DEFAULT_EMAIL_DOMAIN === 'string' ? DEFAULT_EMAIL_DOMAIN : '';
   if (inputEmail && !inputEmail.includes('@') && domain) {
-    return inputEmail + domain; // Append default domain if '@' is missing
+    return inputEmail + domain; 
   }
-  return inputEmail; // Return original if it already has '@' or is empty or domain is invalid
+  return inputEmail; 
 };
 
 
@@ -134,7 +142,7 @@ const handleLogin = async () => {
   successMsg.value = null
   const finalEmail = formatEmail(email.value);
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { error } = await supabase.auth.signInWithPassword({ //
     email: finalEmail,
     password: password.value,
   })
@@ -142,7 +150,7 @@ const handleLogin = async () => {
     errorMsg.value = `登入失敗: ${error.message}`
     console.error("Login error:", error);
   } else {
-    router.push({ name: 'Inspection' }); // Explicit redirect on success
+    router.push({ name: 'Inspection' }); //
   }
   loading.value = false
 }
@@ -154,7 +162,7 @@ const handleSignUp = async () => {
   const finalEmail = formatEmail(email.value);
 
   if (!finalEmail || !password.value) {
-    errorMsg.value = '帳號和密碼不能為空。' // 【修改】錯誤訊息
+    errorMsg.value = '帳號和密碼不能為空。'
     loading.value = false
     return
   }
@@ -165,7 +173,7 @@ const handleSignUp = async () => {
     return
   }
 
-  const { error } = await supabase.auth.signUp({
+  const { error } = await supabase.auth.signUp({ //
     email: finalEmail,
     password: password.value,
   })
@@ -173,8 +181,9 @@ const handleSignUp = async () => {
     errorMsg.value = `註冊失敗: ${error.message}`
      console.error("Signup error:", error);
   } else {
+    // 【修改】提示用戶檢查信箱，不清空 email
     successMsg.value = '註冊請求已送出！請檢查您的電子郵件以完成驗證，然後即可登入。'
-    password.value = '';
+    password.value = ''; // 清空密碼欄位
   }
   loading.value = false
 }
@@ -182,44 +191,9 @@ const handleSignUp = async () => {
 
 <style scoped>
 /* Scoped styles specific to this component */
-.night-gradient {
-  background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
-}
-
-.stars {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  pointer-events: none; /* Make sure stars don't block interaction */
-}
-
-/* Star styles need to be defined outside of @keyframes for JS access */
-.star {
-    position: absolute;
-    background: white;
-    border-radius: 50%;
-    animation-name: twinkle;
-    animation-timing-function: ease-in-out;
-    animation-iteration-count: infinite;
-}
-
 @keyframes twinkle {
-  0%, 100% { opacity: 0.3; transform: scale(0.8); }
-  50% { opacity: 1; transform: scale(1.2); }
+  0%, 100% { opacity: 0.2; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.1); }
 }
-
-.login-card {
-  backdrop-filter: blur(10px);
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); /* Add a subtle shadow */
-}
-
-.input-glow:focus {
-  box-shadow: 0 0 15px rgba(99, 102, 241, 0.4); /* Slightly softer glow */
-  border-color: rgba(99, 102, 241, 0.7); /* Match glow color */
-}
+/* 不需要 .star class，因為我們在 JS 中動態添加了 Tailwind classes */
 </style>

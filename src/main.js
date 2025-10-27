@@ -6,8 +6,8 @@ import { supabase } from './services/supabase'
 import { userStore } from './store/user'
 import { configStore } from './store/config'
 
-// Import your global CSS
-import './index.css' // 匯入 Tailwind 的進入點
+// Import your global CSS (!!! 確保這裡是 index.css !!!)
+import './index.css'
 
 console.log("應用程式初始化開始...");
 

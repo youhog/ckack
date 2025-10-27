@@ -1,45 +1,55 @@
 <template>
-  <header class="card p-8 mb-8">
+  <header class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 md:p-8 mb-8">
       <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
           <div class="flex items-center gap-4">
               <div class="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white text-2xl shadow-lg">
                   🏠
               </div>
               <div>
-                  <h1 class="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+                   <h1 class="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 dark:from-gray-100 dark:to-gray-300 bg-clip-text text-transparent">
                       宿舍房間檢查系統
                   </h1>
-                  <p class="text-gray-500 text-sm mt-1">
+                  <p class="text-slate-500 dark:text-slate-400 text-sm mt-1">
                     歡迎, {{ userEmail }} ({{ userRole }})
                   </p>
               </div>
           </div>
           <div class="flex gap-3 w-full lg:w-auto">
-              <button @click="handleLogout" class="btn btn-secondary" title="登出">
+              <button 
+                @click="handleLogout" 
+                title="登出"
+                class="btn-secondary" >
                 <span class="flex items-center gap-2">🚪 <span class="hidden sm:inline">登出</span></span>
               </button>
+              
               <button 
                 @click="$emit('navigate', 'inspection')" 
-                :class="view === 'inspection' ? 'btn btn-primary' : 'btn-secondary'"
-                class="flex-1 lg:flex-none">
+                :class="view === 'inspection' ? 'btn-primary' : 'btn-secondary'" class="flex-1 lg:flex-none"
+              >
                 <span class="flex items-center gap-2">📋 <span>檢查模式</span></span>
               </button>
+              
               <button 
                 v-if="userRole === 'admin'"
                 @click="$emit('navigate', 'admin')" 
-                :class="view === 'admin' ? 'btn btn-primary' : 'btn-secondary'"
-                class="flex-1 lg:flex-none">
+                :class="view === 'admin' ? 'btn-primary' : 'btn-secondary'" class="flex-1 lg:flex-none"
+              >
                 <span class="flex items-center gap-2">⚙️ <span>後台管理</span></span>
               </button>
           </div>
       </div>
       
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-          <div class="form-group">
-              <label for="dormZone" class="form-label flex items-center gap-2">
+          <div>
+              <label for="dormZone" class="form-label flex items-center gap-1">
                   🏢 <span>宿舍分區</span>
               </label>
-              <select id="dormZone" class="form-control" :value="dormZone" @input="$emit('update:dormZone', $event.target.value)">
+              <select 
+                id="dormZone" 
+                class="form-control" 
+                :value="dormZone" 
+                @input="$emit('update:dormZone', $event.target.value)"
+              >
                   <option value="">請選擇分區</option>
                   <option v-for="zone in config.zones" :key="zone.id" :value="zone.id">
                     {{ zone.name }}
@@ -47,20 +57,22 @@
               </select>
           </div>
 
-          <div class="form-group">
-              <label for="roomNumber" class="form-label flex items-center gap-2">
-                  🚪 <span>房間號碼</span>
-                  <span v-if="validationState === 'loading'" class="text-xs text-gray-500">驗證中...</span>
-                  <span v-if="validationState === 'valid'" class="text-xs text-green-600">✅ 房號正確</span>
-                  <span v-if="validationState === 'invalid'" class="text-xs text-red-500">❌ 查無此房號</span>
+          <div>
+               <label for="roomNumber" class="form-label">
+                  <div class="flex justify-between items-center w-full">
+                    <span class="flex items-center gap-1">🚪 <span>房間號碼</span></span>
+                    <span v-if="validationState === 'loading'" class="text-xs text-slate-500 dark:text-slate-400">驗證中...</span>
+                    <span v-if="validationState === 'valid'" class="text-xs text-green-600 dark:text-green-400">✅ 正確</span>
+                    <span v-if="validationState === 'invalid'" class="text-xs text-red-500 dark:text-red-400">❌ 無此房號</span>
+                  </div>
               </label>
               <input 
                 type="text" 
                 id="roomNumber" 
                 class="form-control" 
                 :class="{ 
-                    'border-green-500 focus:border-green-500 focus:ring-green-100': validationState === 'valid', 
-                    'border-red-500 focus:border-red-500 focus:ring-red-100': validationState === 'invalid' 
+                    'border-green-500 focus:border-green-500 focus:ring-green-500/20': validationState === 'valid', 
+                    'border-red-500 focus:border-red-500 focus:ring-red-500/20': validationState === 'invalid' 
                 }"
                 :value="roomNumberInput"
                 @input="$emit('update:roomNumberInput', $event.target.value)"
@@ -69,40 +81,58 @@
                 placeholder="請先選分區，再輸入房號"
               >
           </div>
-          <div class="form-group">
-              <label for="checkType" class="form-label flex items-center gap-2">
+          <div>
+              <label for="checkType" class="form-label flex items-center gap-1">
                   📝 <span>檢查類型</span>
               </label>
-              <select id="checkType" class="form-control" :value="checkType" @input="$emit('update:checkType', $event.target.value)">
+              <select 
+                id="checkType" 
+                class="form-control" 
+                :value="checkType" 
+                @input="$emit('update:checkType', $event.target.value)"
+              >
                  <option value="">請選擇類型</option>
                  <option v-for="type in config.checkTypes" :key="type.id" :value="type.id">
                   {{ type.name }}
                 </option>
               </select>
           </div>
-          <div class="form-group">
-              <label for="inspector" class="form-label flex items-center gap-2">
+          <div>
+              <label for="inspector" class="form-label flex items-center gap-1">
                   👤 <span>檢查人員</span>
               </label>
-              <input type="text" id="inspector" class="form-control" placeholder="請輸入姓名" :value="inspector" @input="$emit('update:inspector', $event.target.value)">
+              <input 
+                type="text" 
+                id="inspector" 
+                class="form-control" 
+                placeholder="請輸入姓名" 
+                :value="inspector" 
+                @input="$emit('update:inspector', $event.target.value)"
+              >
           </div>
       </div>
       
       <div id="inspectionMode" v-if="view === 'inspection'">
-          <div class="card p-6 mb-6">
-              <div class="flex justify-between items-center mb-4">
+          <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-5">
+              <div class="flex justify-between items-center mb-3">
                   <div class="flex items-center gap-3">
-                      <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl flex items-center justify-center text-white text-lg">
-                          📊
+                      <div class="w-10 h-10 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl flex items-center justify-center text-white text-lg shadow">
+                           📊
                       </div>
-                      <span class="font-semibold text-gray-700">檢查進度</span>
+                      <span class="font-semibold text-slate-700 dark:text-slate-300">檢查進度</span>
                   </div>
-                  <span id="progressText" class="status-indicator" :class="progressClass">
+                  <span 
+                    class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium" 
+                    :class="progressClass"
+                  >
                     {{ progress.completed }}/{{ progress.total }} 完成 ({{ progress.percentage }}%)
                   </span>
               </div>
-              <div class="progress-container">
-                  <div id="progressBar" class="progress-bar" :style="{ width: `${progress.percentage}%` }"></div>
+              <div class="w-full h-2 bg-slate-200 dark:bg-slate-600 rounded-full overflow-hidden">
+                  <div 
+                    class="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full transition-all duration-500 ease-in-out" 
+                    :style="{ width: `${progress.percentage}%` }">
+                  </div>
               </div>
           </div>
       </div>
@@ -110,94 +140,69 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue' // <-- 【新增】 ref, watch
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { supabase } from '../services/supabase' // <-- 【新增】 supabase
-import { userStore } from '../store/user'
-import { configStore } from '../store/config' 
+import { supabase } from '../services/supabase' //
+import { userStore } from '../store/user' //
+import { configStore } from '../store/config' //
 
+// --- (Props, Emits, Router, User, Config logic remains the same) ---
 const props = defineProps({
-  dormZone: String,    // zone.id
-  roomNumber: String,  // 【修改】這仍然是 room.id
-  roomNumberInput: String, // 【新增】這是輸入框的文字
-  checkType: String,   // type.id
+  dormZone: String,
+  roomNumber: String,
+  roomNumberInput: String,
+  checkType: String,
   inspector: String,
   view: String,
   progress: Object
 })
-
-// 【修改】新增 'update:roomNumberInput'
 const emit = defineEmits(['update:dormZone', 'update:roomNumber', 'update:roomNumberInput', 'update:checkType', 'update:inspector', 'navigate'])
-
 const router = useRouter()
-const user = userStore.state.user
+const user = userStore.state.user //
 const userEmail = computed(() => user?.email || '訪客')
-const userRole = computed(() => userStore.state.role)
+const userRole = computed(() => userStore.state.role) //
+const config = configStore.state //
 
-const config = configStore.state
-
+// --- (Logout handler remains the same) ---
 const handleLogout = async () => {
   if (confirm('確定要登出嗎？')) {
-    const { error } = await supabase.auth.signOut()
+    const { error } = await supabase.auth.signOut() //
     if (!error) {
-      router.push({ name: 'Login' })
+      router.push({ name: 'Login' }) //
     }
   }
 }
 
-// 【移除】 availableRooms (不再需要)
-// const availableRooms = computed(() => { ... })
-
-// 【新增】房號驗證邏輯
-const validationState = ref('idle'); // 'idle', 'loading', 'valid', 'invalid'
-
-// 當區域改變時，重設驗證狀態
-watch(() => props.dormZone, () => {
-    validationState.value = 'idle';
-    // AppLayout 會自動清空 ID 和 Input
-});
-
-// 當使用者重新輸入時，重設狀態
+// --- (Room validation logic remains the same) ---
+const validationState = ref('idle');
+watch(() => props.dormZone, () => { validationState.value = 'idle'; });
 watch(() => props.roomNumberInput, (newInput) => {
-    if (validationState.value !== 'idle') {
-        validationState.value = 'idle';
-    }
-    // 同時清除已驗證的 ID，因為輸入變了
-    if (props.roomNumber) {
-        emit('update:roomNumber', '');
-    }
+    if (validationState.value !== 'idle') validationState.value = 'idle';
+    if (props.roomNumber) emit('update:roomNumber', '');
 });
-
-// 當使用者輸入框失焦時 (on-blur)，執行驗證
-const validateRoom = async () => {
+const validateRoom = async () => { /* ... implementation ... */ 
     const zoneId = props.dormZone;
     const roomInput = props.roomNumberInput ? props.roomNumberInput.trim() : '';
-
-    // 如果沒選區域或沒輸入房號，不執行
     if (!zoneId || !roomInput) {
         validationState.value = 'idle';
-        emit('update:roomNumber', ''); // 確保 ID 是空的
+        emit('update:roomNumber', ''); 
         return;
     }
-
     validationState.value = 'loading';
-    
     try {
-        const { data, error } = await supabase
-            .from('rooms')
-            .select('id') // 只需要 ID
+        const { data, error } = await supabase //
+            .from('rooms') //
+            .select('id')
             .eq('zone_id', zoneId)
-            .eq('room_number', roomInput) // 嚴格比對房號文字
-            .single(); // 預期只找到一筆
-
+            .eq('room_number', roomInput)
+            .single(); 
         if (error || !data) {
             console.warn("房號驗證失敗:", error?.message || '找不到房號');
             validationState.value = 'invalid';
-            emit('update:roomNumber', ''); // 傳送空 ID
+            emit('update:roomNumber', '');
         } else {
-            // 找到了！
             validationState.value = 'valid';
-            emit('update:roomNumber', data.id); // 傳送驗證通過的 room.id
+            emit('update:roomNumber', data.id);
         }
     } catch (e) {
         console.error("驗證房號時發生例外:", e);
@@ -207,28 +212,30 @@ const validateRoom = async () => {
 }
 
 
+// --- (Progress class logic remains the same) ---
 const progressClass = computed(() => {
-  if (!props.progress) return 'status-pending'
+  if (!props.progress) return 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
   const p = props.progress.percentage
-  if (p === 100) return 'status-good'
-  if (props.progress.completed > 0) return 'status-missing'
-  return 'status-pending'
+  if (p === 100) return 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-300'
+  if (props.progress.completed > 0) return 'bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-300'
+  return 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
 })
 </script>
 
 <style scoped>
-.form-control.border-green-500 {
-    border-color: #22c55e;
+/* Define reusable styles using @apply */
+.form-label {
+  @apply block mb-1.5 text-sm font-medium text-slate-700 dark:text-slate-300;
 }
-.form-control:focus.border-green-500 {
-    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
-    border-color: #22c55e;
+.form-control {
+  @apply w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700/50 transition-all duration-200 text-sm placeholder-slate-400 dark:placeholder-slate-500;
+  @apply focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20;
+  @apply disabled:bg-slate-100 disabled:opacity-70 dark:disabled:bg-slate-700 dark:disabled:opacity-50;
 }
-.form-control.border-red-500 {
-    border-color: #ef4444;
+.btn-primary {
+  @apply inline-flex items-center justify-center px-4 py-2 rounded-xl font-medium transition-all duration-200 cursor-pointer bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed;
 }
-.form-control:focus.border-red-500 {
-    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
-    border-color: #ef4444;
+.btn-secondary {
+  @apply inline-flex items-center justify-center px-4 py-2 rounded-xl font-medium transition-all duration-200 cursor-pointer bg-white dark:bg-slate-700 border border-slate-900/10 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600 disabled:opacity-60 disabled:cursor-not-allowed;
 }
 </style>
