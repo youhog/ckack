@@ -1,9 +1,9 @@
+// src/views/AppLayout.vue
 <template>
   <div class="container mx-auto px-4 py-8 max-w-7xl">
     <AppHeader
       v-model:dormZone="formState.dormZone"
-      v-model:roomNumber="formState.roomNumber"
-      v-model:roomNumberInput="formState.roomNumberInput"
+      v-model:household="formState.household" v-model:roomNumber="formState.roomNumber"
       v-model:checkType="formState.checkType"
       v-model:inspector="formState.inspector"
       :view="currentView"
@@ -18,8 +18,8 @@
           :progress="inspectionProgress"
           @report-generated="onReportGenerated"
           @checklist-updated="updateInspectionProgress"
-          @update:dormZone="(val) => formState.dormZone = val"    
-          @update:roomNumber="(val) => formState.roomNumber = val"  
+          @update:dormZone="(val) => formState.dormZone = val"
+          @update:household="(val) => formState.household = val" @update:roomNumber="(val) => formState.roomNumber = val"
         />
     </router-view>
   </div>
@@ -28,54 +28,49 @@
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { userStore } from '../store/user' 
-import AppHeader from '../components/AppHeader.vue' 
+import { userStore } from '../store/user' //
+import AppHeader from '../components/AppHeader.vue' //
 
 const route = useRoute()
 const router = useRouter()
-const user = userStore.state.user 
+const user = userStore.state.user
 
-// 將表單狀態提升到佈局層
 const formState = reactive({
-  dormZone: '', 
-  roomNumber: '', // 儲存選中的 room.id (UUID)
-  roomNumberInput: '', // 保留但實際上已不再使用 (AppHeader已移除)
-  checkType: '', 
+  dormZone: '',
+  household: '', // ****** 新增 household 狀態 ******
+  roomNumber: '',
+  checkType: '',
   inspector: user?.email ? user.email.split('@')[0] : '',
 })
 
-// 檢查進度狀態
 const inspectionProgress = ref({
   completed: 0,
   total: 0,
   percentage: 0
 })
 
-// 當前視圖 (檢查、歸還或管理)
 const currentView = computed(() => {
     if (route.path.startsWith('/admin')) return 'admin';
     if (route.name === 'KeyReturn') return 'key-return';
     return 'inspection';
 })
 
-// 導航到不同視圖
 const navigateTo = (view) => {
   if (view === 'admin') {
       if (!route.path.startsWith('/admin')) {
-          router.push({ name: 'AdminDashboard' }) 
+          router.push({ name: 'AdminDashboard' }) //
       }
   } else if (view === 'key-return') {
-      if (route.name !== 'KeyReturn') { 
-         router.push({ name: 'KeyReturn' }) 
+      if (route.name !== 'KeyReturn') { //
+         router.push({ name: 'KeyReturn' }) //
       }
   } else { // 'inspection'
-      if (route.name !== 'Inspection') { 
-         router.push({ name: 'Inspection' }) 
+      if (route.name !== 'Inspection') { //
+         router.push({ name: 'Inspection' }) //
       }
   }
 }
 
-// 監聽來自 Inspection.vue 的進度更新
 const updateInspectionProgress = (progress) => {
   if (progress && typeof progress.completed === 'number' && typeof progress.total === 'number' && typeof progress.percentage === 'number') {
       inspectionProgress.value = progress;
@@ -84,30 +79,32 @@ const updateInspectionProgress = (progress) => {
   }
 }
 
-
-// 監聽來自 Inspection.vue 的報告生成事件
 const onReportGenerated = () => {
-  // 清空檢查人員以外的表單
   formState.dormZone = '';
+  formState.household = ''; // ****** 清空 household ******
   formState.roomNumber = '';
-  formState.roomNumberInput = ''; 
   formState.checkType = '';
   inspectionProgress.value = { completed: 0, total: 0, percentage: 0 }
 }
 
-// 當 user 狀態變化時 (例如登入後)，更新 inspector 預設值
-watch(() => userStore.state.user, (newUser) => { 
+watch(() => userStore.state.user, (newUser) => { //
     if (newUser?.email && !formState.inspector) {
         formState.inspector = newUser.email.split('@')[0];
     }
 }, { immediate: true });
 
-// 當區域改變時，清空房號相關欄位
+// ****** 修改 watch 邏輯 ******
 watch(() => formState.dormZone, (newZone, oldZone) => {
     if (newZone !== oldZone) {
-        formState.roomNumber = '';
-        formState.roomNumberInput = ''; 
+        formState.household = ''; // 清空戶別
+        formState.roomNumber = ''; // 清空房號
     }
 });
+watch(() => formState.household, (newHousehold, oldHousehold) => {
+    if (newHousehold !== oldHousehold) {
+        formState.roomNumber = ''; // 改變戶別時清空房號
+    }
+});
+// ****** 結束修改 ******
 
 </script>

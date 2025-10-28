@@ -16,43 +16,23 @@
               </div>
           </div>
           <div class="flex gap-3 w-full lg:w-auto">
-              <button
-                @click="handleLogout"
-                title="登出"
-                class="btn-secondary"
-              >
+             <button @click="handleLogout" title="登出" class="btn-secondary">
                 <span class="flex items-center gap-2">🚪 <span class="hidden sm:inline">登出</span></span>
               </button>
-
-              <button
-                @click="$emit('navigate', 'inspection')"
-                :class="view === 'inspection' ? 'btn-primary' : 'btn-secondary'"
-                class="flex-1 lg:flex-none"
-              >
+              <button @click="$emit('navigate', 'inspection')" :class="view === 'inspection' ? 'btn-primary' : 'btn-secondary'" class="flex-1 lg:flex-none">
                 <span class="flex items-center gap-2">📋 <span>檢查模式</span></span>
               </button>
-
-              <button
-                @click="$emit('navigate', 'key-return')"
-                :class="view === 'key-return' ? 'btn-primary' : 'btn-secondary'"
-                class="flex-1 lg:flex-none"
-              >
+              <button @click="$emit('navigate', 'key-return')" :class="view === 'key-return' ? 'btn-primary' : 'btn-secondary'" class="flex-1 lg:flex-none">
                 <span class="flex items-center gap-2">🔑 <span>歸還模式</span></span>
               </button>
-
-              <button
-                v-if="canAccessAdminArea"
-                @click="$emit('navigate', 'admin')"
-                :class="view === 'admin' ? 'btn-primary' : 'btn-secondary'"
-                class="flex-1 lg:flex-none"
-              >
+              <button v-if="canAccessAdminArea" @click="$emit('navigate', 'admin')" :class="view === 'admin' ? 'btn-primary' : 'btn-secondary'" class="flex-1 lg:flex-none">
                 <span class="flex items-center gap-2">⚙️ <span>後台管理</span></span>
               </button>
           </div>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-          <div>
+      <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-6">
+          <div class="lg:col-span-1">
               <label for="dormZone" class="form-label flex items-center gap-1">
                   🏢 <span>宿舍分區</span>
               </label>
@@ -69,7 +49,25 @@
               </select>
           </div>
 
-          <div>
+          <div class="lg:col-span-1">
+               <label for="household" class="form-label">
+                  <span class="flex items-center gap-1">🏘️ <span>戶別</span></span>
+              </label>
+              <select
+                id="household"
+                class="form-control"
+                :value="household"
+                @change="onHouseholdChange($event.target.value)"
+                :disabled="!dormZone || availableHouseholds.length === 0 || loadingRooms"
+              >
+                 <option value="">{{ householdSelectPlaceholder }}</option>
+                 <option v-for="hh in availableHouseholds" :key="hh" :value="hh">
+                  {{ hh }} 戶
+                </option>
+              </select>
+          </div>
+
+          <div class="lg:col-span-1">
                <label for="roomNumber" class="form-label">
                   <div class="flex justify-between items-center w-full">
                     <span class="flex items-center gap-1">🚪 <span>房間號碼</span></span>
@@ -81,15 +79,15 @@
                 class="form-control"
                 :value="roomNumber"
                 @change="$emit('update:roomNumber', $event.target.value)"
-                :disabled="!dormZone || availableRooms.length === 0 || loadingRooms"
+                :disabled="!dormZone || (hasHouseholds && !household) || availableRooms.length === 0 || loadingRooms"
               >
                  <option value="">請選擇房號</option>
                  <option v-for="room in availableRooms" :key="room.id" :value="room.id">
-                  {{ room.room_number }}
-                </option>
+                  {{ room.floor }}樓 {{ room.room_number }} </option>
               </select>
-              </div>
-          <div>
+          </div>
+
+          <div class="lg:col-span-1">
               <label for="checkType" class="form-label flex items-center gap-1">
                   📝 <span>檢查類型</span>
               </label>
@@ -106,7 +104,7 @@
                 </option>
               </select>
           </div>
-          <div>
+          <div class="lg:col-span-1">
               <label for="inspector" class="form-label flex items-center gap-1">
                   👤 <span>檢查人員</span>
               </label>
@@ -122,31 +120,8 @@
               >
           </div>
       </div>
-
-      <div id="inspectionMode" v-if="view === 'inspection'">
-          <div class="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-5">
-              <div class="flex justify-between items-center mb-3">
-                  <div class="flex items-center gap-3">
-                      <div class="w-10 h-10 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl flex items-center justify-center text-white text-lg shadow">
-                           📊
-                      </div>
-                      <span class="font-semibold text-slate-700 dark:text-slate-300">檢查進度</span>
-                  </div>
-                  <span
-                    class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium"
-                    :class="progressClass"
-                  >
-                    {{ progress.completed }}/{{ progress.total }} 完成 ({{ progress.percentage }}%)
-                  </span>
-              </div>
-              <div class="w-full h-2 bg-slate-200 dark:bg-slate-600 rounded-full overflow-hidden">
-                  <div
-                    class="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full transition-all duration-500 ease-in-out"
-                    :style="{ width: `${progress.percentage}%` }">
-                  </div>
-              </div>
+       <div id="inspectionMode" v-if="view === 'inspection'">
           </div>
-      </div>
       <ConfirmModal
         v-model="showLogoutConfirm"
         title="確認登出"
@@ -159,25 +134,27 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { supabase } from '../services/supabase'
-import { userStore } from '../store/user'
-import { configStore } from '../store/config' // 載入 configStore
-import ConfirmModal from './ConfirmModal.vue';
-import { showToast } from '@/utils';
-import { onMounted } from 'vue'; // <--- **加入這一行**
+import { supabase } from '../services/supabase' //
+import { userStore } from '../store/user' //
+import { configStore } from '../store/config' //
+import ConfirmModal from './ConfirmModal.vue'; //
+import { showToast } from '@/utils'; //
 
+// ****** 修改 Props 和 Emits ******
 const props = defineProps({
   dormZone: String,
+  household: String, // 新增 household prop
   roomNumber: String,
-  // roomNumberInput: String, // 移除
   checkType: String,
   inspector: String,
   view: String,
   progress: Object
 })
-const emit = defineEmits(['update:dormZone', 'update:roomNumber', /*'update:roomNumberInput',*/ 'update:checkType', 'update:inspector', 'navigate']) // 移除 roomNumberInput
+const emit = defineEmits(['update:dormZone', 'update:household', 'update:roomNumber', 'update:checkType', 'update:inspector', 'navigate'])
+// ****** 結束修改 ******
+
 const router = useRouter()
 const user = userStore.state.user
 const userEmail = computed(() => user?.email || '訪客')
@@ -188,12 +165,10 @@ const showLogoutConfirm = ref(false);
 const allRooms = ref([]);
 const loadingRooms = ref(false);
 
-// --- 判斷是否顯示 "後台管理" 按鈕 ---
-// 邏輯：只要使用者擁有任一管理相關的權限，就顯示按鈕
 const canAccessAdminArea = computed(() => {
-    // 列出所有可能進入 Admin 區塊的權限
+    // ... (判斷邏輯不變) ...
     const adminAreaPermissions = [
-        'read_all_reports', // For Dashboard
+        'read_all_reports',
         'manage_zones',
         'manage_rooms',
         'manage_types',
@@ -202,17 +177,18 @@ const canAccessAdminArea = computed(() => {
         'manage_permissions',
         'manage_users'
     ];
-    // 使用 some 檢查是否至少有一個權限符合
     return adminAreaPermissions.some(permission => configStore.userHasPermission(permission));
 });
-// --- 結束判斷 ---
 
 const fetchAllRooms = async () => {
     loadingRooms.value = true;
     try {
+        // 查詢保持不變，包含 floor 和 household
         const { data, error } = await supabase
-            .from('rooms')
-            .select('id, zone_id, room_number')
+            .from('rooms') //
+            .select('id, zone_id, room_number, floor, household')
+            .order('floor', { ascending: true })
+            .order('household', { ascending: true, nullsFirst: true })
             .order('room_number', { ascending: true });
 
         if (error) throw error;
@@ -224,26 +200,67 @@ const fetchAllRooms = async () => {
         loadingRooms.value = false;
     }
 }
-// 只有在元件掛載後才載入房間列表，避免不必要的請求
+
 onMounted(fetchAllRooms);
 
-
-const availableRooms = computed(() => {
+// ****** 新增計算屬性 ******
+// 取得目前分區下所有不重複的 household 值 (排除 null 或空字串)
+const availableHouseholds = computed(() => {
     if (!props.dormZone) return [];
-    // 直接使用已載入的 allRooms 進行過濾和排序
-    return allRooms.value
-        .filter(room => room.zone_id === props.dormZone)
-        // 確保 room_number 存在且為字串再排序
-        .sort((a, b) => (a.room_number || '').localeCompare(b.room_number || '', undefined, { numeric: true, sensitivity: 'base' }));
+    const households = allRooms.value
+        .filter(room => room.zone_id === props.dormZone && room.household) // 過濾掉 household 為 null 或空字串
+        .map(room => room.household);
+    return [...new Set(households)].sort(); // 去重並排序
 });
 
+// 判斷當前選中分區是否有戶別資訊
+const hasHouseholds = computed(() => availableHouseholds.value.length > 0);
 
+// 戶別下拉選單的 placeholder
+const householdSelectPlaceholder = computed(() => {
+    if (!props.dormZone) return '請先選分區';
+    if (loadingRooms.value) return '載入中...';
+    if (hasHouseholds.value) return '請選擇戶別';
+    return '此區無戶別';
+});
+// ****** 結束新增 ******
+
+
+// ****** 修改 availableRooms 計算屬性 ******
+const availableRooms = computed(() => {
+    if (!props.dormZone) return [];
+
+    let filtered = allRooms.value.filter(room => room.zone_id === props.dormZone);
+
+    // 如果該分區有戶別，且使用者已選擇戶別，則進一步篩選
+    if (hasHouseholds.value && props.household) {
+        filtered = filtered.filter(room => room.household === props.household);
+    }
+    // 如果該分區有戶別，但使用者尚未選擇戶別，則不顯示任何房間 (等待戶別選擇)
+    else if (hasHouseholds.value && !props.household) {
+       return [];
+    }
+    // 如果該分區沒有戶別，則直接使用分區篩選結果
+
+    // 排序已在 fetchAllRooms 完成
+    return filtered;
+});
+// ****** 結束修改 ******
+
+// ****** 修改 onZoneChange ******
 const onZoneChange = (newZoneId) => {
     emit('update:dormZone', newZoneId);
-    emit('update:roomNumber', ''); // 清空 roomNumber (ID)
-    // emit('update:roomNumberInput', ''); // 移除
+    emit('update:household', ''); // 清空戶別
+    emit('update:roomNumber', ''); // 清空房號
 }
+// ****** 結束修改 ******
 
+// ****** 新增 onHouseholdChange ******
+const onHouseholdChange = (newHousehold) => {
+    emit('update:household', newHousehold);
+    emit('update:roomNumber', ''); // 改變戶別時清空房號
+}
+// ****** 結束新增 ******
 
 const handleLogout = () => {
   showLogoutConfirm.value = true;
@@ -252,8 +269,7 @@ const handleLogout = () => {
 const executeLogout = async () => {
   const { error } = await supabase.auth.signOut()
   if (!error) {
-    // 登出後，userStore 和 configStore 應被清除 (在 main.js 的監聽器中處理)
-    router.push({ name: 'Login' })
+    router.push({ name: 'Login' }) //
   } else {
     showToast(`登出失敗: ${error.message}`, 'error');
     console.error("登出失敗:", error);
@@ -261,12 +277,11 @@ const executeLogout = async () => {
 }
 
 const progressClass = computed(() => {
+  // ... (進度條樣式邏輯不變) ...
   if (!props.progress) return 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
   const p = props.progress.percentage
   if (p === 100) return 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-300'
-  // 即使只完成一部分也顯示黃色
   if (props.progress.completed > 0) return 'bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-300'
-  // 預設 (0 完成)
   return 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
 })
 </script>
@@ -279,8 +294,9 @@ const progressClass = computed(() => {
 .form-control {
   @apply w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700/50 transition-all duration-200 text-sm placeholder-slate-400 dark:placeholder-slate-500 text-slate-800 dark:text-slate-200;
   @apply focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20;
-  /* 針對 readonly/disabled 欄位，優化深色模式下的對比度 */
-  @apply disabled:bg-slate-100 disabled:opacity-100 dark:disabled:bg-slate-700 dark:disabled:text-slate-400;
+}
+.form-control:disabled {
+  @apply bg-slate-100 dark:bg-slate-700/80 text-slate-500 dark:text-slate-400 cursor-not-allowed border-slate-200 dark:border-slate-600;
 }
 .btn-primary {
   @apply inline-flex items-center justify-center px-4 py-2 rounded-xl font-medium transition-all duration-200 cursor-pointer bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-md hover:shadow-lg hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed;
