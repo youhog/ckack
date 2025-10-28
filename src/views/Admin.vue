@@ -1,4 +1,4 @@
-// youhog/ckack/ckack-10cc0a3bfb263ad24e91487d07fabdff03536175/src/views/Admin.vue
+// youhog/ckack/ckack-RBAC-creat/src/views/Admin.vue
 <template>
   <main id="adminContent" class="space-y-6">
     <AdminStats />
@@ -6,11 +6,11 @@
     <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6">
       <h3 class="text-xl font-semibold text-slate-800 dark:text-slate-100 mb-4">管理員控制台</h3>
       <div class="flex flex-wrap gap-3">
-        <router-link 
-          v-for="link in adminLinks" 
+        <router-link
+          v-for="link in adminLinks"
           :key="link.name"
-          :to="{ name: link.name }" 
-          class="nav-link" 
+          :to="{ name: link.name }"
+          class="nav-link"
           active-class="nav-link-active"
         >
           <span class="flex items-center gap-2 justify-center">{{ link.icon }} {{ link.text }}</span>
@@ -23,15 +23,22 @@
        </p>
     </div>
 
-    <router-view />
-  </main>
+    <router-view v-slot="{ Component }">
+      <keep-alive>
+        <component :is="Component" :key="$route.fullPath" />
+      </keep-alive>
+    </router-view>
+    </main>
 </template>
 
 <script setup>
 import { computed } from 'vue'
-import AdminStats from '@/components/AdminStats.vue' 
+import AdminStats from '@/components/AdminStats.vue'
+import { configStore } from '@/store/config' // 引入 configStore 以獲取角色描述
 
-// 【新增】導航連結資料
+const config = configStore.state
+
+// 導航連結資料
 const adminLinks = [
   { name: 'AdminDashboard', icon: '📊', text: '儀表板' },
   { name: 'ManageZones', icon: '🏢', text: '管理區域' },
@@ -39,11 +46,11 @@ const adminLinks = [
   { name: 'ManageTypes', icon: '📝', text: '管理類型' },
   { name: 'ManageChecklist', icon: '📋', text: '管理檢查項目' },
   { name: 'ManageAllocation', icon: '🛏️', text: '床位匯入' },
-  { name: 'ManagePermissions', icon: '🔒', text: '權限管理' }, // ADDED
-  { name: 'ManageUsers', icon: '👥', text: '管理使用者' } 
+  { name: 'ManagePermissions', icon: '🔒', text: '權限管理' },
+  { name: 'ManageUsers', icon: '👥', text: '管理使用者' }
 ];
 
-// Supabase 儀表板連結 (保持不變)
+// Supabase 儀表板連結
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const projectRef = computed(() => {
     try {
@@ -57,14 +64,21 @@ const projectRef = computed(() => {
 });
 const supabaseDashboardUrl = computed(() => {
     if (projectRef.value) {
-        return `https://supabase.com/dashboard/project/${projectRef.value}/editor/table/user_roles?schema=public`; 
+        return `https://supabase.com/dashboard/project/${projectRef.value}/editor/table/user_roles?schema=public`;
     }
     return 'https://supabase.com/dashboard';
 });
 
+// 動態獲取角色描述的輔助函數 (已修改為動態)
+const getRoleDescription = (roleName) => {
+    const role = config.roles.find(r => r.name === roleName);
+    return role?.description || '系統定義角色';
+}
+
 </script>
 
 <style scoped>
+/* 樣式保持不變 */
 .nav-link {
   @apply inline-flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-all duration-200 cursor-pointer flex-grow sm:flex-grow-0;
   @apply bg-white dark:bg-slate-700 border border-slate-900/10 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600;
@@ -73,10 +87,9 @@ const supabaseDashboardUrl = computed(() => {
   @apply bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-md border-transparent hover:shadow-lg dark:hover:bg-blue-600;
 }
 
-/* 讓按鈕在小螢幕上可以稍微換行 */
-@media (max-width: 640px) { /* sm breakpoint */
+@media (max-width: 640px) {
     .flex-wrap > .nav-link {
-        min-width: calc(50% - 0.375rem); /* 減去 gap-3 的一半 */
+        min-width: calc(50% - 0.375rem);
     }
 }
 </style>
