@@ -1,37 +1,9 @@
--- --- 宿舍檢查系統 - 完整刪除與重建 SQL 腳本 (v12.5 - 無 LOG) ---
-
--- ****** 警告：以下指令將徹底刪除所有相關表格和資料！ ******
--- ****** 請在執行前務必備份您的資料庫！ ******
+-- --- 宿舍檢查系統 - 全新建立 SQL 腳本 (整合 RBAC 與預設資料 v1) ---
+--
+-- 說明：此腳本用於建立所有必要的表格、函數、RLS 策略，
+--       並插入基礎的角色權限設定和一些範例資料。
 --
 -- ----------------------------------------------------------------
-
--- --- 第 -1 部分：完整刪除舊有結構 ---
-DROP FUNCTION IF EXISTS public.get_my_role() CASCADE;
-DROP FUNCTION IF EXISTS public.update_user_role(uuid, text) CASCADE;
-DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
-DROP FUNCTION IF EXISTS public.setup_permissions() CASCADE;
-DROP FUNCTION IF EXISTS public.import_existing_users() CASCADE;
-
-DROP TABLE IF EXISTS public.role_permissions CASCADE;
-DROP TABLE IF EXISTS public.student_allocations CASCADE;
-DROP TABLE IF EXISTS public.key_returns CASCADE;
-DROP TABLE IF EXISTS public.reports CASCADE;
-DROP TABLE IF EXISTS public.user_roles CASCADE;
-DROP TABLE IF EXISTS public.profiles CASCADE;
-DROP TABLE IF EXISTS public.checklist_items CASCADE;
-DROP TABLE IF EXISTS public.checklist_categories CASCADE;
-DROP TABLE IF EXISTS public.check_types CASCADE;
-DROP TABLE IF EXISTS public.rooms CASCADE;
-DROP TABLE IF EXISTS public.dorm_zones CASCADE;
-DROP TABLE IF EXISTS public.permissions CASCADE;
-DROP TABLE IF EXISTS public.roles CASCADE;
-
--- --- 第 0 部分：預先刪除可能衝突的函數 (再次確保) ---
-DROP FUNCTION IF EXISTS public.get_my_role() CASCADE;
-DROP FUNCTION IF EXISTS public.update_user_role(uuid, text) CASCADE;
-DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
-DROP FUNCTION IF EXISTS public.setup_permissions() CASCADE;
-DROP FUNCTION IF EXISTS public.import_existing_users() CASCADE;
 
 -- --- 第 1 部分：建立資料表 ---
 --
@@ -41,6 +13,7 @@ DROP FUNCTION IF EXISTS public.import_existing_users() CASCADE;
 CREATE TABLE public.roles (id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY, name text NOT NULL UNIQUE, description text NULL);
 CREATE TABLE public.permissions (id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY, name text NOT NULL UNIQUE, description text NULL);
 CREATE TABLE public.role_permissions (role_id uuid NOT NULL, permission_id uuid NOT NULL, PRIMARY KEY (role_id, permission_id));
+
 -- 應用程式表格
 CREATE TABLE public.dorm_zones (id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY, created_at timestamp with time zone DEFAULT now() NOT NULL, name text NOT NULL UNIQUE, description text);
 CREATE TABLE public.rooms (id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY, created_at timestamp with time zone DEFAULT now() NOT NULL, zone_id uuid NOT NULL, household text NULL, floor text NOT NULL, room_number text NOT NULL, capacity integer DEFAULT 4 NOT NULL, CONSTRAINT rooms_zone_floor_number_key UNIQUE (zone_id, floor, room_number), CONSTRAINT rooms_capacity_check CHECK ((capacity > 0)));
@@ -58,15 +31,15 @@ CREATE TABLE public.student_allocations (id uuid DEFAULT gen_random_uuid() NOT N
 -- ----------------------------------------------------------------
 ALTER TABLE public.role_permissions ADD CONSTRAINT role_permissions_role_id_fkey FOREIGN KEY (role_id) REFERENCES public.roles (id) ON DELETE CASCADE;
 ALTER TABLE public.role_permissions ADD CONSTRAINT role_permissions_permission_id_fkey FOREIGN KEY (permission_id) REFERENCES public.permissions (id) ON DELETE CASCADE;
-ALTER TABLE public.user_roles ADD CONSTRAINT user_roles_role_fkey FOREIGN KEY (role) REFERENCES public.roles (name) ON DELETE RESTRICT;
+ALTER TABLE public.user_roles ADD CONSTRAINT user_roles_role_fkey FOREIGN KEY (role) REFERENCES public.roles (name) ON DELETE RESTRICT; -- 限制刪除角色，若有使用者使用中
 ALTER TABLE public.profiles ADD CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users (id) ON DELETE CASCADE;
 ALTER TABLE public.user_roles ADD CONSTRAINT user_roles_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users (id) ON DELETE CASCADE;
-ALTER TABLE public.rooms ADD CONSTRAINT rooms_zone_id_fkey FOREIGN KEY (zone_id) REFERENCES public.dorm_zones (id) ON DELETE CASCADE;
-ALTER TABLE public.checklist_items ADD CONSTRAINT checklist_items_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.checklist_categories (id) ON DELETE CASCADE;
-ALTER TABLE public.reports ADD CONSTRAINT reports_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users (id) ON DELETE SET NULL;
-ALTER TABLE public.reports ADD CONSTRAINT reports_zone_id_fkey FOREIGN KEY (zone_id) REFERENCES public.dorm_zones (id) ON DELETE SET NULL;
-ALTER TABLE public.reports ADD CONSTRAINT reports_room_id_fkey FOREIGN KEY (room_id) REFERENCES public.rooms (id) ON DELETE SET NULL;
-ALTER TABLE public.reports ADD CONSTRAINT reports_check_type_id_fkey FOREIGN KEY (check_type_id) REFERENCES public.check_types (id) ON DELETE SET NULL;
+ALTER TABLE public.rooms ADD CONSTRAINT rooms_zone_id_fkey FOREIGN KEY (zone_id) REFERENCES public.dorm_zones (id) ON DELETE CASCADE; -- 刪除區域時，級聯刪除其下房間
+ALTER TABLE public.checklist_items ADD CONSTRAINT checklist_items_category_id_fkey FOREIGN KEY (category_id) REFERENCES public.checklist_categories (id) ON DELETE CASCADE; -- 刪除分類時，級聯刪除其下項目
+ALTER TABLE public.reports ADD CONSTRAINT reports_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users (id) ON DELETE SET NULL; -- 刪除使用者時，報告保留但 user_id 設為 NULL
+ALTER TABLE public.reports ADD CONSTRAINT reports_zone_id_fkey FOREIGN KEY (zone_id) REFERENCES public.dorm_zones (id) ON DELETE SET NULL; -- 刪除區域時，報告保留但 zone_id 設為 NULL
+ALTER TABLE public.reports ADD CONSTRAINT reports_room_id_fkey FOREIGN KEY (room_id) REFERENCES public.rooms (id) ON DELETE SET NULL; -- 刪除房間時，報告保留但 room_id 設為 NULL
+ALTER TABLE public.reports ADD CONSTRAINT reports_check_type_id_fkey FOREIGN KEY (check_type_id) REFERENCES public.check_types (id) ON DELETE SET NULL; -- 刪除類型時，報告保留但 check_type_id 設為 NULL
 ALTER TABLE public.key_returns ADD CONSTRAINT key_returns_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users (id) ON DELETE SET NULL;
 ALTER TABLE public.key_returns ADD CONSTRAINT key_returns_zone_id_fkey FOREIGN KEY (zone_id) REFERENCES public.dorm_zones (id) ON DELETE CASCADE;
 ALTER TABLE public.key_returns ADD CONSTRAINT key_returns_room_id_fkey FOREIGN KEY (room_id) REFERENCES public.rooms (id) ON DELETE CASCADE;
@@ -76,21 +49,237 @@ ALTER TABLE public.student_allocations ADD CONSTRAINT student_allocations_zone_i
 -- --- 第 3 部分：資料庫函數與觸發器 ---
 --
 -- ----------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.get_my_role() RETURNS text LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS $$ SELECT role FROM public.user_roles WHERE user_id = auth.uid(); $$;
-CREATE OR REPLACE FUNCTION public.handle_new_user() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$ BEGIN INSERT INTO public.profiles (id, email, created_at) VALUES (NEW.id, NEW.email, NEW.created_at) ON CONFLICT (id) DO NOTHING; IF EXISTS (SELECT 1 FROM public.roles WHERE name = 'inspector') THEN INSERT INTO public.user_roles (user_id, role) VALUES (NEW.id, 'inspector') ON CONFLICT (user_id) DO NOTHING; ELSE RAISE WARNING 'Default role "inspector" not found for new user %', NEW.id; END IF; RETURN NEW; END; $$;
-CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
-CREATE OR REPLACE FUNCTION public.update_user_role(target_user_id uuid, new_role text) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$ DECLARE current_user_role text; target_user_current_role text; BEGIN SELECT public.get_my_role() INTO current_user_role; IF current_user_role NOT IN ('admin', 'superadmin') THEN RAISE EXCEPTION '權限不足'; END IF; IF NOT EXISTS (SELECT 1 FROM public.roles WHERE name = new_role) THEN RAISE EXCEPTION '無效的角色: %', new_role; END IF; IF target_user_id = auth.uid() THEN RAISE EXCEPTION '無法更改自己的角色'; END IF; SELECT role INTO target_user_current_role FROM public.user_roles WHERE user_id = target_user_id; IF target_user_current_role = 'superadmin' THEN RAISE EXCEPTION '無法更改 superadmin 的角色'; END IF; INSERT INTO public.user_roles (user_id, role) VALUES (target_user_id, new_role) ON CONFLICT (user_id) DO UPDATE SET role = new_role; END; $$;
-CREATE OR REPLACE FUNCTION public.setup_permissions() RETURNS text LANGUAGE plpgsql AS $$ DECLARE role_admin_id uuid; role_inspector_id uuid; role_superadmin_id uuid; role_sdc_id uuid; role_sdsc_id uuid; BEGIN INSERT INTO public.roles (name, description) VALUES ('admin', '管理員'), ('inspector', '檢查員'), ('superadmin', '超級管理員'), ('sdc', '宿委會'), ('sdsc', '宿服') ON CONFLICT (name) DO NOTHING; SELECT id INTO role_admin_id FROM public.roles WHERE name = 'admin'; SELECT id INTO role_inspector_id FROM public.roles WHERE name = 'inspector'; SELECT id INTO role_superadmin_id FROM public.roles WHERE name = 'superadmin'; SELECT id INTO role_sdc_id FROM public.roles WHERE name = 'sdc'; SELECT id INTO role_sdsc_id FROM public.roles WHERE name = 'sdsc'; IF role_admin_id IS NULL OR role_inspector_id IS NULL OR role_superadmin_id IS NULL OR role_sdc_id IS NULL OR role_sdsc_id IS NULL THEN RAISE EXCEPTION '基礎角色查詢失敗'; END IF; INSERT INTO public.permissions (name, description) VALUES ('read_all_reports', '讀取報告'), ('manage_zones', '管理區域'), ('manage_rooms', '管理房間'), ('manage_types', '管理類型'), ('manage_checklist', '管理檢查項目'), ('manage_allocations', '管理床位分配'), ('manage_users', '管理使用者'), ('manage_permissions', '管理權限') ON CONFLICT (name) DO NOTHING; DELETE FROM public.role_permissions WHERE role_id IN (role_admin_id, role_inspector_id, role_superadmin_id, role_sdc_id, role_sdsc_id); INSERT INTO public.role_permissions (role_id, permission_id) SELECT role_superadmin_id, id FROM public.permissions ON CONFLICT DO NOTHING; INSERT INTO public.role_permissions (role_id, permission_id) SELECT role_admin_id, id FROM public.permissions ON CONFLICT DO NOTHING; INSERT INTO public.role_permissions (role_id, permission_id) SELECT role_inspector_id, id FROM public.permissions WHERE name = 'read_all_reports' ON CONFLICT DO NOTHING; INSERT INTO public.role_permissions (role_id, permission_id) SELECT role_sdc_id, id FROM public.permissions WHERE name IN ('read_all_reports', 'manage_zones', 'manage_rooms', 'manage_checklist', 'manage_allocations') ON CONFLICT DO NOTHING; INSERT INTO public.role_permissions (role_id, permission_id) SELECT role_sdsc_id, id FROM public.permissions WHERE name = 'read_all_reports' ON CONFLICT DO NOTHING; RETURN '基礎角色和權限設置完成'; END; $$;
-CREATE OR REPLACE FUNCTION public.import_existing_users() RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$ DECLARE user_record record; inserted_profiles integer := 0; inserted_roles integer := 0; BEGIN IF NOT EXISTS (SELECT 1 FROM public.roles WHERE name = 'inspector') THEN RAISE WARNING '預設角色 "inspector" 不存在，無法設定預設角色。'; RETURN '匯入中止：預設角色 "inspector" 不存在。'; END IF; FOR user_record IN SELECT id, email, created_at FROM auth.users LOOP INSERT INTO public.profiles (id, email, created_at) VALUES (user_record.id, user_record.email, user_record.created_at) ON CONFLICT (id) DO NOTHING; IF FOUND THEN inserted_profiles := inserted_profiles + 1; END IF; INSERT INTO public.user_roles (user_id, role) VALUES (user_record.id, 'inspector') ON CONFLICT (user_id) DO NOTHING; IF FOUND THEN inserted_roles := inserted_roles + 1; END IF; END LOOP; RETURN '既有使用者匯入完成。新增 profiles: ' || inserted_profiles || ', 新增 user_roles: ' || inserted_roles; END; $$;
+
+-- 獲取當前使用者的角色 (應用程式用)
+CREATE OR REPLACE FUNCTION public.get_my_role()
+ RETURNS text
+ LANGUAGE sql
+ SECURITY DEFINER
+ STABLE SET search_path = public
+AS $function$
+  SELECT role FROM public.user_roles WHERE user_id = auth.uid();
+$function$;
+
+-- 處理新註冊的使用者 (自動建立 profile 和預設角色 'inspector')
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER SET search_path = public
+AS $function$
+BEGIN
+  -- 插入 profile
+  INSERT INTO public.profiles (id, email, created_at)
+  VALUES (NEW.id, NEW.email, NEW.created_at)
+  ON CONFLICT (id) DO NOTHING; -- 如果 profile 已存在則忽略
+
+  -- 檢查 'inspector' 角色是否存在
+  IF EXISTS (SELECT 1 FROM public.roles WHERE name = 'inspector') THEN
+    -- 分配預設角色 'inspector'
+    INSERT INTO public.user_roles (user_id, role)
+    VALUES (NEW.id, 'inspector')
+    ON CONFLICT (user_id) DO NOTHING; -- 如果角色已存在則忽略
+  ELSE
+    -- 如果 'inspector' 角色不存在，發出警告
+    RAISE WARNING 'Default role "inspector" not found. Cannot assign default role to new user %', NEW.id;
+  END IF;
+
+  RETURN NEW;
+END;
+$function$;
+
+-- 建立觸發器，在 auth.users 表格插入新使用者後執行 handle_new_user 函數
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- 更新使用者角色 (供 admin/superadmin 使用)
+CREATE OR REPLACE FUNCTION public.update_user_role(target_user_id uuid, new_role text)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER SET search_path = public
+AS $function$
+DECLARE
+  current_user_role text;
+  target_user_current_role text;
+BEGIN
+  -- 1. 檢查執行者權限
+  SELECT public.get_my_role() INTO current_user_role;
+  IF current_user_role NOT IN ('admin', 'superadmin') THEN
+    RAISE EXCEPTION '權限不足：只有 admin 或 superadmin 可以更改使用者角色。';
+  END IF;
+
+  -- 2. 檢查目標角色是否存在
+  IF NOT EXISTS (SELECT 1 FROM public.roles WHERE name = new_role) THEN
+    RAISE EXCEPTION '無效的角色: %', new_role;
+  END IF;
+
+  -- 3. 禁止更改自己的角色
+  IF target_user_id = auth.uid() THEN
+    RAISE EXCEPTION '無法更改自己的角色。';
+  END IF;
+
+  -- 4. 禁止更改 superadmin 的角色
+  SELECT role INTO target_user_current_role FROM public.user_roles WHERE user_id = target_user_id;
+  IF target_user_current_role = 'superadmin' THEN
+     RAISE EXCEPTION '無法更改 superadmin 的角色。';
+  END IF;
+
+  -- 5. 執行更新或插入
+  INSERT INTO public.user_roles (user_id, role)
+  VALUES (target_user_id, new_role)
+  ON CONFLICT (user_id) DO UPDATE SET role = new_role;
+END;
+$function$;
+
+-- 設定基礎角色與權限 (核心 RBAC 設定)
+CREATE OR REPLACE FUNCTION public.setup_permissions()
+ RETURNS text
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+  role_admin_id uuid;
+  role_inspector_id uuid;
+  role_superadmin_id uuid;
+  role_sdc_id uuid;         -- 宿委會
+  role_sdsc_id uuid;        -- 宿服
+BEGIN
+  -- 1. 插入基礎角色 (若不存在)
+  INSERT INTO public.roles (name, description) VALUES
+    ('admin', '管理員'),
+    ('inspector', '檢查員'),
+    ('superadmin', '超級管理員'),
+    ('sdc', '宿委會'),
+    ('sdsc', '宿服')
+  ON CONFLICT (name) DO NOTHING;
+
+  -- 2. 獲取角色 ID
+  SELECT id INTO role_admin_id FROM public.roles WHERE name = 'admin';
+  SELECT id INTO role_inspector_id FROM public.roles WHERE name = 'inspector';
+  SELECT id INTO role_superadmin_id FROM public.roles WHERE name = 'superadmin';
+  SELECT id INTO role_sdc_id FROM public.roles WHERE name = 'sdc';
+  SELECT id INTO role_sdsc_id FROM public.roles WHERE name = 'sdsc';
+
+  -- 檢查是否所有角色都成功獲取 ID
+  IF role_admin_id IS NULL OR role_inspector_id IS NULL OR role_superadmin_id IS NULL OR role_sdc_id IS NULL OR role_sdsc_id IS NULL THEN
+    RAISE EXCEPTION '基礎角色 ID 查詢失敗，無法設定權限。請檢查 roles 表格。';
+  END IF;
+
+  -- 3. 插入權限 (若不存在)
+  INSERT INTO public.permissions (name, description) VALUES
+    ('read_all_reports', '讀取所有檢查報告'),
+    ('manage_zones', '管理宿舍區域'),
+    ('manage_rooms', '管理房間'),
+    ('manage_types', '管理檢查類型'),
+    ('manage_checklist', '管理檢查項目'),
+    ('manage_allocations', '管理學生床位分配'),
+    ('manage_users', '管理使用者帳號與角色'),
+    ('manage_permissions', '管理角色權限')
+  ON CONFLICT (name) DO NOTHING;
+
+  -- 4. 清除這些角色的舊權限關聯 (確保冪等性)
+  DELETE FROM public.role_permissions
+  WHERE role_id IN (role_admin_id, role_inspector_id, role_superadmin_id, role_sdc_id, role_sdsc_id);
+
+  -- 5. 分配權限給角色
+  -- superadmin: 擁有所有權限
+  INSERT INTO public.role_permissions (role_id, permission_id)
+  SELECT role_superadmin_id, id FROM public.permissions
+  ON CONFLICT DO NOTHING;
+
+  -- admin: 擁有所有權限 (與 superadmin 相同，以便於管理)
+  INSERT INTO public.role_permissions (role_id, permission_id)
+  SELECT role_admin_id, id FROM public.permissions
+  ON CONFLICT DO NOTHING;
+
+  -- inspector: 只能讀取報告
+  INSERT INTO public.role_permissions (role_id, permission_id)
+  SELECT role_inspector_id, id FROM public.permissions WHERE name = 'read_all_reports'
+  ON CONFLICT DO NOTHING;
+
+  -- sdc (宿委會): 讀取報告、管理區域、房間、檢查項目、床位分配
+  INSERT INTO public.role_permissions (role_id, permission_id)
+  SELECT role_sdc_id, id FROM public.permissions
+  WHERE name IN ('read_all_reports', 'manage_zones', 'manage_rooms', 'manage_checklist', 'manage_allocations')
+  ON CONFLICT DO NOTHING;
+
+  -- sdsc (宿服): 只能讀取報告
+  INSERT INTO public.role_permissions (role_id, permission_id)
+  SELECT role_sdsc_id, id FROM public.permissions WHERE name = 'read_all_reports'
+  ON CONFLICT DO NOTHING;
+
+  RETURN '基礎角色和權限設置完成';
+END;
+$function$;
+
+-- 將 auth.users 中已存在的使用者同步到 profiles 和 user_roles
+CREATE OR REPLACE FUNCTION public.import_existing_users()
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER SET search_path = public
+AS $function$
+DECLARE
+  user_record record;
+  inserted_profiles integer := 0;
+  inserted_roles integer := 0;
+BEGIN
+  -- 再次確認 'inspector' 角色存在
+  IF NOT EXISTS (SELECT 1 FROM public.roles WHERE name = 'inspector') THEN
+    RAISE WARNING '預設角色 "inspector" 不存在，無法設定預設角色。';
+    RETURN '匯入中止：預設角色 "inspector" 不存在。';
+  END IF;
+
+  -- 遍歷 auth.users
+  FOR user_record IN SELECT id, email, created_at FROM auth.users LOOP
+    -- 插入 profile (若不存在)
+    INSERT INTO public.profiles (id, email, created_at)
+    VALUES (user_record.id, user_record.email, user_record.created_at)
+    ON CONFLICT (id) DO NOTHING;
+    -- 記錄是否插入了新的 profile
+    IF FOUND THEN
+      inserted_profiles := inserted_profiles + 1;
+    END IF;
+
+    -- 插入預設角色 'inspector' (若不存在)
+    INSERT INTO public.user_roles (user_id, role)
+    VALUES (user_record.id, 'inspector')
+    ON CONFLICT (user_id) DO NOTHING;
+    -- 記錄是否插入了新的角色
+    IF FOUND THEN
+      inserted_roles := inserted_roles + 1;
+    END IF;
+  END LOOP;
+
+  RETURN '既有使用者匯入完成。新增 profiles: ' || inserted_profiles || ', 新增 user_roles: ' || inserted_roles;
+END;
+$function$;
 
 -- --- 第 4 部分：儲存體 (Storage) ---
 -- ****** 此部分需透過 Supabase UI 手動設定 ******
+-- 1. 前往 Storage -> Buckets -> Create bucket
+-- 2. Bucket name: photos
+-- 3. Public bucket: 勾選 (On)
+-- 4. 點擊 "Create bucket"
+-- 5. 點擊建立好的 'photos' Bucket -> Policies
+-- 6. 點擊 "New policy" -> "Create a policy from scratch"
+-- 7. Policy name: Authenticated Upload
+-- 8. Allowed operations: 勾選 INSERT
+-- 9. Target roles: 勾選 authenticated
+-- 10. USING expression / WITH CHECK expression (Policy definition):
+--     (bucket_id = 'photos') AND (auth.uid() = (storage.foldername(name))[1]::uuid)
+--     -- 說明：這允許已登入使用者在自己 user_id 的資料夾下上傳檔案
+-- 11. 點擊 "Review" -> "Save policy"
+-- (預設的 Public Read 策略通常已存在，允許所有人讀取)
 -- ----------------------------------------------------------------
 
 -- --- 第 5 部分：資料列層級安全性 (RLS) 策略 ---
 --
 -- ----------------------------------------------------------------
 -- 啟用 RLS
+-- --- 第 5 部分：資料列層級安全性 (RLS) 策略 (修正版) ---
+--
+-- ----------------------------------------------------------------
+
+-- 啟用 RLS (如果尚未啟用)
 ALTER TABLE public.dorm_zones ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.rooms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.check_types ENABLE ROW LEVEL SECURITY;
@@ -105,83 +294,222 @@ ALTER TABLE public.roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.permissions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.role_permissions ENABLE ROW LEVEL SECURITY;
 
--- 清除舊策略
+-- 強制啟用 RLS
+ALTER TABLE public.dorm_zones FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.rooms FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.check_types FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.checklist_categories FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.checklist_items FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.profiles FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.user_roles FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.reports FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.key_returns FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.student_allocations FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.roles FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.permissions FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.role_permissions FORCE ROW LEVEL SECURITY;
+
+-- --- 清除舊策略 (確保替換) ---
 DROP POLICY IF EXISTS "Allow authenticated read" ON public.dorm_zones;
-DROP POLICY IF EXISTS "Allow admin manage" ON public.dorm_zones;
+DROP POLICY IF EXISTS "Allow managers manage" ON public.dorm_zones;
+DROP POLICY IF EXISTS "Allow admin manage" ON public.dorm_zones; -- 清除舊命名
 DROP POLICY IF EXISTS "Allow authenticated read" ON public.rooms;
-DROP POLICY IF EXISTS "Allow admin manage" ON public.rooms;
+DROP POLICY IF EXISTS "Allow managers manage" ON public.rooms;
+DROP POLICY IF EXISTS "Allow admin manage" ON public.rooms; -- 清除舊命名
 DROP POLICY IF EXISTS "Allow authenticated read" ON public.check_types;
-DROP POLICY IF EXISTS "Allow admin manage" ON public.check_types;
+DROP POLICY IF EXISTS "Allow managers manage" ON public.check_types;
+DROP POLICY IF EXISTS "Allow admin manage" ON public.check_types; -- 清除舊命名
 DROP POLICY IF EXISTS "Allow authenticated read" ON public.checklist_categories;
-DROP POLICY IF EXISTS "Allow admin manage" ON public.checklist_categories;
+DROP POLICY IF EXISTS "Allow managers manage" ON public.checklist_categories;
+DROP POLICY IF EXISTS "Allow admin manage" ON public.checklist_categories; -- 清除舊命名
 DROP POLICY IF EXISTS "Allow authenticated read" ON public.checklist_items;
-DROP POLICY IF EXISTS "Allow admin manage" ON public.checklist_items;
+DROP POLICY IF EXISTS "Allow managers manage" ON public.checklist_items;
+DROP POLICY IF EXISTS "Allow admin manage" ON public.checklist_items; -- 清除舊命名
 DROP POLICY IF EXISTS "Allow user read own" ON public.profiles;
-DROP POLICY IF EXISTS "Allow admin read all" ON public.profiles;
-DROP POLICY IF EXISTS "Allow admin read all" ON public.user_roles;
+DROP POLICY IF EXISTS "Allow managers read all" ON public.profiles;
+DROP POLICY IF EXISTS "Allow admin read all" ON public.profiles; -- 清除旧命名
+DROP POLICY IF EXISTS "Allow managers read all" ON public.user_roles;
+DROP POLICY IF EXISTS "Allow admin read all" ON public.user_roles; -- 清除旧命名
 DROP POLICY IF EXISTS "Allow user insert own" ON public.reports;
-DROP POLICY IF EXISTS "Allow owner or admin read" ON public.reports;
-DROP POLICY IF EXISTS "Allow owner or admin delete" ON public.reports;
-DROP POLICY IF EXISTS "Allow admin update" ON public.reports;
+DROP POLICY IF EXISTS "Allow readers read" ON public.reports;
+DROP POLICY IF EXISTS "Allow owner or admin read" ON public.reports; -- 清除旧命名
+DROP POLICY IF EXISTS "Allow owner or manager delete" ON public.reports;
+DROP POLICY IF EXISTS "Allow owner or admin delete" ON public.reports; -- 清除旧命名
 DROP POLICY IF EXISTS "Allow user insert own" ON public.key_returns;
-DROP POLICY IF EXISTS "Allow owner or admin read" ON public.key_returns;
-DROP POLICY IF EXISTS "Allow admin delete" ON public.key_returns;
+DROP POLICY IF EXISTS "Allow readers read" ON public.key_returns;
+DROP POLICY IF EXISTS "Allow owner or admin read" ON public.key_returns; -- 清除旧命名
+DROP POLICY IF EXISTS "Allow manager delete" ON public.key_returns;
+DROP POLICY IF EXISTS "Allow admin delete" ON public.key_returns; -- 清除旧命名
 DROP POLICY IF EXISTS "Allow authenticated read" ON public.student_allocations;
-DROP POLICY IF EXISTS "Allow admin manage" ON public.student_allocations;
+DROP POLICY IF EXISTS "Allow managers manage" ON public.student_allocations;
+DROP POLICY IF EXISTS "Allow admin manage" ON public.student_allocations; -- 清除旧命名
 DROP POLICY IF EXISTS "Allow authenticated read" ON public.roles;
-DROP POLICY IF EXISTS "Allow admin manage" ON public.roles;
+DROP POLICY IF EXISTS "Allow managers manage" ON public.roles;
+DROP POLICY IF EXISTS "Allow admin manage" ON public.roles; -- 清除旧命名
 DROP POLICY IF EXISTS "Allow authenticated read" ON public.permissions;
-DROP POLICY IF EXISTS "Allow admin manage" ON public.permissions;
+DROP POLICY IF EXISTS "Allow managers manage" ON public.permissions;
+DROP POLICY IF EXISTS "Allow admin manage" ON public.permissions; -- 清除旧命名
 DROP POLICY IF EXISTS "Allow authenticated read" ON public.role_permissions;
-DROP POLICY IF EXISTS "Allow admin manage" ON public.role_permissions;
+DROP POLICY IF EXISTS "Allow managers manage" ON public.role_permissions;
+DROP POLICY IF EXISTS "Allow admin manage" ON public.role_permissions; -- 清除旧命名
 
--- 創建新策略
-CREATE POLICY "Allow authenticated read" ON public.dorm_zones FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Allow admin manage" ON public.dorm_zones FOR ALL TO authenticated USING (public.get_my_role() IN ('admin', 'superadmin')) WITH CHECK (public.get_my_role() IN ('admin', 'superadmin'));
-CREATE POLICY "Allow authenticated read" ON public.rooms FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Allow admin manage" ON public.rooms FOR ALL TO authenticated USING (public.get_my_role() IN ('admin', 'superadmin')) WITH CHECK (public.get_my_role() IN ('admin', 'superadmin'));
-CREATE POLICY "Allow authenticated read" ON public.check_types FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Allow admin manage" ON public.check_types FOR ALL TO authenticated USING (public.get_my_role() IN ('admin', 'superadmin')) WITH CHECK (public.get_my_role() IN ('admin', 'superadmin'));
-CREATE POLICY "Allow authenticated read" ON public.checklist_categories FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Allow admin manage" ON public.checklist_categories FOR ALL TO authenticated USING (public.get_my_role() IN ('admin', 'superadmin')) WITH CHECK (public.get_my_role() IN ('admin', 'superadmin'));
-CREATE POLICY "Allow authenticated read" ON public.checklist_items FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Allow admin manage" ON public.checklist_items FOR ALL TO authenticated USING (public.get_my_role() IN ('admin', 'superadmin')) WITH CHECK (public.get_my_role() IN ('admin', 'superadmin'));
-CREATE POLICY "Allow user read own" ON public.profiles FOR SELECT TO authenticated USING (id = auth.uid());
-CREATE POLICY "Allow admin read all" ON public.profiles FOR SELECT TO authenticated USING (public.get_my_role() IN ('admin', 'superadmin'));
-CREATE POLICY "Allow admin read all" ON public.user_roles FOR SELECT TO authenticated USING (public.get_my_role() IN ('admin', 'superadmin'));
-CREATE POLICY "Allow user insert own" ON public.reports FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
-CREATE POLICY "Allow owner or admin read" ON public.reports FOR SELECT TO authenticated USING (user_id = auth.uid() OR public.get_my_role() IN ('admin', 'superadmin'));
-CREATE POLICY "Allow owner or admin delete" ON public.reports FOR DELETE TO authenticated USING (user_id = auth.uid() OR public.get_my_role() IN ('admin', 'superadmin'));
-CREATE POLICY "Allow user insert own" ON public.key_returns FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
-CREATE POLICY "Allow owner or admin read" ON public.key_returns FOR SELECT TO authenticated USING (user_id = auth.uid() OR public.get_my_role() IN ('admin', 'superadmin'));
-CREATE POLICY "Allow authenticated read" ON public.student_allocations FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Allow admin manage" ON public.student_allocations FOR ALL TO authenticated USING (public.get_my_role() IN ('admin', 'superadmin')) WITH CHECK (public.get_my_role() IN ('admin', 'superadmin'));
+-- --- 創建修正後的策略 ---
+
+-- roles: 允許所有登入者讀取，只有 admin/superadmin 可管理
 CREATE POLICY "Allow authenticated read" ON public.roles FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Allow admin manage" ON public.roles FOR ALL TO authenticated USING (public.get_my_role() IN ('admin', 'superadmin')) WITH CHECK (public.get_my_role() IN ('admin', 'superadmin'));
-CREATE POLICY "Allow authenticated read" ON public.permissions FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Allow admin manage" ON public.permissions FOR ALL TO authenticated USING (public.get_my_role() IN ('admin', 'superadmin')) WITH CHECK (public.get_my_role() IN ('admin', 'superadmin'));
-CREATE POLICY "Allow authenticated read" ON public.role_permissions FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Allow admin manage" ON public.role_permissions FOR ALL TO authenticated USING (public.get_my_role() IN ('admin', 'superadmin')) WITH CHECK (public.get_my_role() IN ('admin', 'superadmin'));
+CREATE POLICY "Allow managers manage" ON public.roles FOR ALL TO authenticated
+  USING (public.get_my_role() IN ('admin', 'superadmin'))
+  WITH CHECK (public.get_my_role() IN ('admin', 'superadmin'));
 
--- --- 第 6 部分：範例資料 ---
+-- permissions: 允許所有登入者讀取，只有 admin/superadmin 可管理
+CREATE POLICY "Allow authenticated read" ON public.permissions FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Allow managers manage" ON public.permissions FOR ALL TO authenticated
+  USING (public.get_my_role() IN ('admin', 'superadmin'))
+  WITH CHECK (public.get_my_role() IN ('admin', 'superadmin'));
+
+-- role_permissions: 允許所有登入者讀取，只有 admin/superadmin 可管理
+CREATE POLICY "Allow authenticated read" ON public.role_permissions FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Allow managers manage" ON public.role_permissions FOR ALL TO authenticated
+  USING (public.get_my_role() IN ('admin', 'superadmin'))
+  WITH CHECK (public.get_my_role() IN ('admin', 'superadmin'));
+
+-- user_roles: 只有 admin/superadmin 可讀取所有，(更新由函數處理)
+CREATE POLICY "Allow managers read all" ON public.user_roles FOR SELECT TO authenticated
+  USING (public.get_my_role() IN ('admin', 'superadmin'));
+-- (可選) 允許使用者讀取自己的角色
+-- CREATE POLICY "Allow user read own role" ON public.user_roles FOR SELECT TO authenticated USING (user_id = auth.uid());
+
+-- dorm_zones: 登入可讀，特定角色可管理
+CREATE POLICY "Allow authenticated read" ON public.dorm_zones FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Allow managers manage" ON public.dorm_zones FOR ALL TO authenticated
+  USING (public.get_my_role() IN ('admin', 'superadmin', 'sdc')) -- 根據 setup_permissions
+  WITH CHECK (public.get_my_role() IN ('admin', 'superadmin', 'sdc'));
+
+-- rooms: 登入可讀，特定角色可管理
+CREATE POLICY "Allow authenticated read" ON public.rooms FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Allow managers manage" ON public.rooms FOR ALL TO authenticated
+  USING (public.get_my_role() IN ('admin', 'superadmin', 'sdc')) -- 根據 setup_permissions
+  WITH CHECK (public.get_my_role() IN ('admin', 'superadmin', 'sdc'));
+
+-- check_types: 登入可讀，特定角色可管理
+CREATE POLICY "Allow authenticated read" ON public.check_types FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Allow managers manage" ON public.check_types FOR ALL TO authenticated
+  USING (public.get_my_role() IN ('admin', 'superadmin')) -- 根據 setup_permissions
+  WITH CHECK (public.get_my_role() IN ('admin', 'superadmin'));
+
+-- checklist_categories: 登入可讀，特定角色可管理
+CREATE POLICY "Allow authenticated read" ON public.checklist_categories FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Allow managers manage" ON public.checklist_categories FOR ALL TO authenticated
+  USING (public.get_my_role() IN ('admin', 'superadmin', 'sdc')) -- 根據 setup_permissions
+  WITH CHECK (public.get_my_role() IN ('admin', 'superadmin', 'sdc'));
+
+-- checklist_items: 登入可讀，特定角色可管理
+CREATE POLICY "Allow authenticated read" ON public.checklist_items FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Allow managers manage" ON public.checklist_items FOR ALL TO authenticated
+  USING (public.get_my_role() IN ('admin', 'superadmin', 'sdc')) -- 根據 setup_permissions
+  WITH CHECK (public.get_my_role() IN ('admin', 'superadmin', 'sdc'));
+
+-- profiles: 使用者讀自己，admin/superadmin 讀全部
+CREATE POLICY "Allow user read own" ON public.profiles FOR SELECT TO authenticated USING (id = auth.uid());
+CREATE POLICY "Allow managers read all" ON public.profiles FOR SELECT TO authenticated
+  USING (public.get_my_role() IN ('admin', 'superadmin'));
+
+-- reports: 使用者寫自己；自己或有權限者讀；自己或 admin/superadmin 刪
+CREATE POLICY "Allow user insert own" ON public.reports FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
+CREATE POLICY "Allow readers read" ON public.reports FOR SELECT TO authenticated
+  USING (user_id = auth.uid() OR public.get_my_role() IN ('admin', 'superadmin', 'sdc', 'sdsc'));
+CREATE POLICY "Allow owner or manager delete" ON public.reports FOR DELETE TO authenticated
+  USING (user_id = auth.uid() OR public.get_my_role() IN ('admin', 'superadmin'));
+
+-- key_returns: 使用者寫自己；自己或有權限者讀；admin/superadmin 刪
+CREATE POLICY "Allow user insert own" ON public.key_returns FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
+CREATE POLICY "Allow readers read" ON public.key_returns FOR SELECT TO authenticated
+  USING (user_id = auth.uid() OR public.get_my_role() IN ('admin', 'superadmin', 'sdc', 'sdsc'));
+CREATE POLICY "Allow manager delete" ON public.key_returns FOR DELETE TO authenticated
+  USING (public.get_my_role() IN ('admin', 'superadmin'));
+
+-- student_allocations: 登入可讀，特定角色可管理
+CREATE POLICY "Allow authenticated read" ON public.student_allocations FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Allow managers manage" ON public.student_allocations FOR ALL TO authenticated
+  USING (public.get_my_role() IN ('admin', 'superadmin', 'sdc')) -- 根據 setup_permissions
+  WITH CHECK (public.get_my_role() IN ('admin', 'superadmin', 'sdc'));
+
+-- --- RLS 策略設定完成 ---
+-- --- 第 6 部分：插入預設資料 ---
 --
 -- ----------------------------------------------------------------
-INSERT INTO public.check_types (name, description) VALUES ('學期初檢查', '入住前狀況'), ('期中安全檢查', '例行抽查'), ('寒假離宿檢查', '離宿清空狀況') ON CONFLICT (name) DO NOTHING;
-INSERT INTO public.dorm_zones (name, description) VALUES ('A 區 (男生宿舍)', '東側'), ('B 區 (女生宿舍)', '西側') ON CONFLICT (name) DO NOTHING;
-INSERT INTO public.rooms (zone_id, floor, room_number, capacity) SELECT z.id, r.floor, r.room_number, r.cap FROM public.dorm_zones z, (VALUES ('1', '101', 4), ('1', '102', 4), ('2', '201', 2), ('2', '202', 4)) AS r(floor, room_number, cap) WHERE z.name LIKE 'A 區%' ON CONFLICT (zone_id, floor, room_number) DO NOTHING;
-INSERT INTO public.rooms (zone_id, household, floor, room_number, capacity) SELECT z.id, r.household, r.floor, r.room_number, r.cap FROM public.dorm_zones z, (VALUES ('H1', '1', '101', 4), ('H1', '1', '102', 2), ('H2', '2', '201', 4), ('H2', '2', '202', 4)) AS r(household, floor, room_number, cap) WHERE z.name LIKE 'B 區%' ON CONFLICT (zone_id, floor, room_number) DO NOTHING;
-INSERT INTO public.student_allocations (student_id, zone_id, room_id, bed_number) SELECT 'S12345678', dz.id, r.id, '1' FROM public.dorm_zones dz JOIN public.rooms r ON dz.id = r.zone_id WHERE dz.name = 'A 區 (男生宿舍)' AND r.floor = '1' AND r.room_number = '101' ON CONFLICT (student_id) DO UPDATE SET zone_id=EXCLUDED.zone_id, room_id=EXCLUDED.room_id, bed_number=EXCLUDED.bed_number;
-INSERT INTO public.student_allocations (student_id, zone_id, room_id, bed_number) SELECT 'S87654321', dz.id, r.id, '2' FROM public.dorm_zones dz JOIN public.rooms r ON dz.id = r.zone_id WHERE dz.name = 'A 區 (男生宿舍)' AND r.floor = '1' AND r.room_number = '101' ON CONFLICT (student_id) DO UPDATE SET zone_id=EXCLUDED.zone_id, room_id=EXCLUDED.room_id, bed_number=EXCLUDED.bed_number;
-INSERT INTO public.student_allocations (student_id, zone_id, room_id, bed_number) SELECT 'S99988877', dz.id, r.id, '1' FROM public.dorm_zones dz JOIN public.rooms r ON dz.id = r.zone_id WHERE dz.name = 'B 區 (女生宿舍)' AND r.household = 'H1' AND r.floor = '1' AND r.room_number = '102' ON CONFLICT (student_id) DO UPDATE SET zone_id=EXCLUDED.zone_id, room_id=EXCLUDED.room_id, bed_number=EXCLUDED.bed_number;
-INSERT INTO public.student_allocations (student_id, zone_id, room_id, bed_number) SELECT 'S11122233', dz.id, r.id, '2' FROM public.dorm_zones dz JOIN public.rooms r ON dz.id = r.zone_id WHERE dz.name = 'B 區 (女生宿舍)' AND r.household = 'H1' AND r.floor = '1' AND r.room_number = '102' ON CONFLICT (student_id) DO UPDATE SET zone_id=EXCLUDED.zone_id, room_id=EXCLUDED.room_id, bed_number=EXCLUDED.bed_number;
-INSERT INTO public.checklist_categories (name, icon, display_order) VALUES ('寢室區域', '🛏️', 1), ('衛浴區域', '🛁', 2), ('公共區域/陽台', '🪴', 3) ON CONFLICT (name) DO NOTHING;
-INSERT INTO public.checklist_items (category_id, name, display_order) SELECT c.id, item.name, item.ord FROM public.checklist_categories c, (VALUES ('寢室區域', '床架 (含床板)', 1), ('寢室區域', '書桌', 2), ('寢室區域', '椅子', 3), ('寢室區域', '衣櫃', 4), ('寢室區域', '冷氣 (含遙控器)', 5), ('衛浴區域', '馬桶 (含水箱)', 1), ('衛浴區域', '洗手台 (含水龍頭)', 2), ('衛浴區域', '淋浴設備 (含蓮蓬頭)', 3), ('衛浴區域', '置物架', 4), ('公共區域/陽台', '地板清潔', 1), ('公共區域/陽台', '陽台窗戶', 2)) AS item(cat_name, name, ord) WHERE c.name = item.cat_name ON CONFLICT (category_id, name) DO NOTHING;
+-- 插入檢查類型
+INSERT INTO public.check_types (name, description) VALUES
+  ('學期初檢查', '檢查學生入住前的房間狀況'),
+  ('期中安全檢查', '例行性的安全與衛生抽查'),
+  ('寒假離宿檢查', '確認學生寒假離宿時的清空狀況')
+ON CONFLICT (name) DO NOTHING;
+
+-- 插入宿舍區域
+INSERT INTO public.dorm_zones (name, description) VALUES
+  ('A 區 (男生宿舍)', 'A 區位於東側，靠近籃球場'),
+  ('B 區 (女生宿舍)', 'B 區位於西側，靠近餐廳')
+ON CONFLICT (name) DO NOTHING;
+
+-- 插入房間 (使用 CTE 獲取 zone_id)
+WITH zone_a AS (SELECT id FROM public.dorm_zones WHERE name = 'A 區 (男生宿舍)'),
+     zone_b AS (SELECT id FROM public.dorm_zones WHERE name = 'B 區 (女生宿舍)')
+INSERT INTO public.rooms (zone_id, floor, room_number, capacity, household) VALUES
+  -- A 區
+  ((SELECT id FROM zone_a), '1', '101', 4, NULL),
+  ((SELECT id FROM zone_a), '1', '102', 4, NULL),
+  ((SELECT id FROM zone_a), '2', '201', 4, NULL),
+  ((SELECT id FROM zone_a), '2', '202', 4, NULL),
+  -- B 區 (假設有 household)
+  ((SELECT id FROM zone_b), '1', '101', 4, 'H1'),
+  ((SELECT id FROM zone_b), '1', '102', 2, 'H1'), -- 假設 102 是兩人房
+  ((SELECT id FROM zone_b), '2', '201', 4, 'H2'),
+  ((SELECT id FROM zone_b), '2', '202', 4, 'H2')
+ON CONFLICT (zone_id, floor, room_number) DO NOTHING;
+
+-- 插入檢查項目分類
+INSERT INTO public.checklist_categories (name, icon, display_order) VALUES
+  ('寢室區域', '🛏️', 1),
+  ('衛浴區域', '🛁', 2),
+  ('公共區域/陽台', '🪴', 3)
+ON CONFLICT (name) DO NOTHING;
+
+-- 插入檢查項目 (使用 CTE 獲取 category_id)
+WITH cat_bedroom AS (SELECT id FROM public.checklist_categories WHERE name = '寢室區域'),
+     cat_bathroom AS (SELECT id FROM public.checklist_categories WHERE name = '衛浴區域'),
+     cat_public AS (SELECT id FROM public.checklist_categories WHERE name = '公共區域/陽台')
+INSERT INTO public.checklist_items (category_id, name, display_order) VALUES
+  -- 寢室區域
+  ((SELECT id FROM cat_bedroom), '床架 (含床板)', 1),
+  ((SELECT id FROM cat_bedroom), '書桌', 2),
+  ((SELECT id FROM cat_bedroom), '椅子', 3),
+  ((SELECT id FROM cat_bedroom), '衣櫃', 4),
+  ((SELECT id FROM cat_bedroom), '冷氣 (含遙控器)', 5),
+  -- 衛浴區域
+  ((SELECT id FROM cat_bathroom), '馬桶 (含水箱)', 1),
+  ((SELECT id FROM cat_bathroom), '洗手台 (含水龍頭)', 2),
+  ((SELECT id FROM cat_bathroom), '淋浴設備 (含蓮蓬頭)', 3),
+  ((SELECT id FROM cat_bathroom), '置物架', 4),
+  -- 公共區域/陽台
+  ((SELECT id FROM cat_public), '地板清潔', 1),
+  ((SELECT id FROM cat_public), '陽台窗戶', 2)
+ON CONFLICT (category_id, name) DO NOTHING;
+
+-- (可選) 插入學生床位分配範例 (如果需要測試匯入功能，可以省略這裡)
+-- INSERT INTO public.student_allocations (student_id, zone_id, room_id, bed_number)
+-- SELECT 'S12345678', dz.id, r.id, '1' FROM public.dorm_zones dz JOIN public.rooms r ON dz.id = r.zone_id WHERE dz.name = 'A 區 (男生宿舍)' AND r.floor = '1' AND r.room_number = '101' ON CONFLICT (student_id) DO UPDATE SET zone_id=EXCLUDED.zone_id, room_id=EXCLUDED.room_id, bed_number=EXCLUDED.bed_number;
+-- INSERT INTO public.student_allocations (student_id, zone_id, room_id, bed_number)
+-- SELECT 'S87654321', dz.id, r.id, '2' FROM public.dorm_zones dz JOIN public.rooms r ON dz.id = r.zone_id WHERE dz.name = 'A 區 (男生宿舍)' AND r.floor = '1' AND r.room_number = '101' ON CONFLICT (student_id) DO UPDATE SET zone_id=EXCLUDED.zone_id, room_id=EXCLUDED.room_id, bed_number=EXCLUDED.bed_number;
+
 
 -- --- 第 7 部分：執行初始化函數 ---
 --
 -- ----------------------------------------------------------------
-SELECT public.import_existing_users();
+-- 執行基礎角色與權限設定 (確保 roles, permissions, role_permissions 表格有資料)
 SELECT public.setup_permissions();
+
+-- 同步既有使用者 (將 auth.users 中已存在的使用者加入 profiles 和 user_roles)
+SELECT public.import_existing_users();
 
 -- ----------------------------------------------------------------
 -- --- 腳本執行完畢 ---
